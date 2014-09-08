@@ -15,29 +15,38 @@ public abstract class BaseJsonParserUTF8
    private byte[] byteBuffer;
    private int bufferLimit;
 
-   protected ArrayDeque<Object> parseDeque;
+   protected ArrayDeque<Object> valueDeque;
+   //protected ArrayDeque<Object> memberDeque;
 
    public BaseJsonParserUTF8() {
       byteBuffer = new byte[BUFFER_SIZE];
-      parseDeque = new ArrayDeque<>(32);
+      valueDeque = new ArrayDeque<>(32);
+      //memberDeque = new ArrayDeque<>(32);
    }
 
+   @SuppressWarnings("unchecked")
    public <T> T parseObject(InputStream src, Class<T> valueType)
    {
       source = src;
 
+      parseObject(0, valueType);
+      return (T) valueDeque.removeLast();
+   }
+
+   private int parseObject(int bufferIndex, Class<?> targetType)
+   {
       try {
-         T instance = valueType.newInstance();
-         parseDeque.add(instance);
-         parseObject(0);
-         return instance;
+         Object newInstance = targetType.newInstance();
+         valueDeque.add(newInstance);
+         bufferIndex = parseObject(bufferIndex, newInstance);
+         return bufferIndex;
       }
       catch (InstantiationException | IllegalAccessException e) {
          throw new RuntimeException(e);
       }
    }
 
-   private int parseObject(int bufferIndex)
+   private <T> int parseObject(int bufferIndex, T target)
    {
       try {
 loop:    while (true) {
@@ -52,7 +61,7 @@ loop:    while (true) {
             switch (byteBuffer[bufferIndex]) {
             case '{':
                bufferIndex++;
-               bufferIndex = parseMembers(bufferIndex);
+               bufferIndex = parseMembers(bufferIndex, target);
                continue;
             case '}':
                bufferIndex++;
@@ -69,7 +78,7 @@ loop:    while (true) {
       }      
    }
 
-   private int parseMembers(int bufferIndex)
+   private <T> int parseMembers(int bufferIndex, T target)
    {
       try {
          while (true) {
@@ -88,8 +97,10 @@ loop:    while (true) {
                continue;
             case ':':
                bufferIndex++;
-               bufferIndex = parseValue(bufferIndex);  // member value
-               setMember(parseDeque.removeLast(), parseDeque.removeLast());
+               String memberName = (String) valueDeque.removeLast();
+               Class<?> memberType = getMemberType(memberName, target.getClass());
+               bufferIndex = parseValue(bufferIndex, target, memberType);
+               setMember(target, valueDeque.removeLast() /* member value */, memberName);
                continue;
             case '}':
                return bufferIndex;
@@ -103,9 +114,11 @@ loop:    while (true) {
       }      
    }
 
-   protected abstract void setMember(Object value, Object member);
+   protected abstract void setMember(Object target, Object value, Object member);
 
-   private int parseValue(int bufferIndex)
+   protected abstract Class<?> getMemberType(String memberName, Class<?> valueType);
+   
+   private int parseValue(int bufferIndex, Object target, Class<?> targetType)
    {
       try {
 loop:    while (true) {
@@ -124,18 +137,18 @@ loop:    while (true) {
                return bufferIndex;
             case 't':
                bufferIndex++;
-               parseDeque.add(true);
+               valueDeque.add(true);
                break loop;
             case 'f':
                bufferIndex++;
-               parseDeque.add(false);
+               valueDeque.add(false);
                break loop;
             case 'n':
                bufferIndex++;
-               parseDeque.add(null);
+               valueDeque.add(null);
                break loop;
             case '{':
-               bufferIndex = parseObject(bufferIndex);
+               bufferIndex = parseObject(bufferIndex, targetType);
                break loop;
             case '[':
                bufferIndex++;
@@ -155,7 +168,14 @@ loop:    while (true) {
 
    private int parseArray(int bufferIndex)
    {
-      return bufferIndex;
+      valueDeque.add(Void.TYPE);
+      for (; bufferIndex < bufferLimit; bufferIndex++) {
+         if (byteBuffer[bufferIndex] == ']') {
+            return bufferIndex;
+         }
+      }
+
+      throw new RuntimeException("Insufficent data.");
    }
 
    public int parseString(int bufferIndex)
@@ -185,7 +205,7 @@ loop:    while (true) {
             int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
             if (newIndex > 0) {
                bufferIndex = newIndex + 1;
-               parseDeque.add(new String(byteBuffer, startIndex, (newIndex - startIndex), "UTF-8"));
+               valueDeque.add(new String(byteBuffer, startIndex, (newIndex - startIndex), "UTF-8"));
                return bufferIndex;
             }
             else if (newIndex == -1) {

@@ -5,23 +5,23 @@ import java.util.List;
 @SuppressWarnings("unused")
 public class MenuBar
 {
-   private Menu menu;
+   public Menu menu;
 
    public static class Menu
    {
-      private String id;
-      private String value;
-      private Popup popup;
+      public String id;
+      public String value;
+      public Popup popup;
    }
 
    public static class Popup
    {
-      private List<MenuItem> menuitem;
+      public List<MenuItem> menuitem;
    }
 
    public static class MenuItem
    {
-      String value;
-      String onclick;
+      public String value;
+      public String onclick;
    }
 }
