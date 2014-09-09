@@ -9,6 +9,17 @@ import java.util.ArrayDeque;
 
 public abstract class BaseJsonParserUTF8
 {
+   protected static final char CR = '\r';
+   protected static final char TAB = '\t';
+   protected static final char SPACE = ' ';
+   protected static final char QUOTE = '"';
+   protected static final char COLON = ':';
+   protected static final char NEWLINE = '\n';
+   protected static final char OPEN_CURLY = '{';
+   protected static final char CLOSE_CURLY = '}';
+   protected static final char OPEN_BRACKET = '[';
+   protected static final char CLOSE_BRACKET = ']';
+
    private final int BUFFER_SIZE = 16384;
 
    private InputStream source;
@@ -16,12 +27,10 @@ public abstract class BaseJsonParserUTF8
    private int bufferLimit;
 
    protected ArrayDeque<Object> valueDeque;
-   //protected ArrayDeque<Object> memberDeque;
 
    public BaseJsonParserUTF8() {
       byteBuffer = new byte[BUFFER_SIZE];
       valueDeque = new ArrayDeque<>(32);
-      //memberDeque = new ArrayDeque<>(32);
    }
 
    @SuppressWarnings("unchecked")
@@ -36,9 +45,10 @@ public abstract class BaseJsonParserUTF8
    private int parseObject(int bufferIndex, Class<?> targetType)
    {
       try {
-         Object newInstance = targetType.newInstance();
-         valueDeque.add(newInstance);
-         bufferIndex = parseObject(bufferIndex, newInstance);
+         Context context = new Context(targetType);
+         context.createInstance();
+         valueDeque.add(context);
+         bufferIndex = parseObject(bufferIndex, context);
          return bufferIndex;
       }
       catch (InstantiationException | IllegalAccessException e) {
@@ -46,7 +56,7 @@ public abstract class BaseJsonParserUTF8
       }
    }
 
-   private <T> int parseObject(int bufferIndex, T target)
+   private int parseObject(int bufferIndex, Context context)
    {
       try {
 loop:    while (true) {
@@ -59,11 +69,11 @@ loop:    while (true) {
             }
 
             switch (byteBuffer[bufferIndex]) {
-            case '{':
+            case OPEN_CURLY:
                bufferIndex++;
-               bufferIndex = parseMembers(bufferIndex, target);
+               bufferIndex = parseMembers(bufferIndex, context);
                continue;
-            case '}':
+            case CLOSE_CURLY:
                bufferIndex++;
                break loop;
             default:
@@ -78,7 +88,7 @@ loop:    while (true) {
       }      
    }
 
-   private <T> int parseMembers(int bufferIndex, T target)
+   private int parseMembers(int bufferIndex, Context context)
    {
       try {
          while (true) {
@@ -91,18 +101,18 @@ loop:    while (true) {
             }
 
             switch (byteBuffer[bufferIndex]) {
-            case '"':
+            case QUOTE:
                bufferIndex++;
                bufferIndex = parseString(bufferIndex); // member name
                continue;
-            case ':':
+            case COLON:
                bufferIndex++;
                String memberName = (String) valueDeque.removeLast();
-               Class<?> memberType = getMemberType(memberName, target.getClass());
-               bufferIndex = parseValue(bufferIndex, target, memberType);
-               setMember(target, valueDeque.removeLast() /* member value */, memberName);
+//               Class<?> memberType = getMemberType(memberName, context.getClass());
+               bufferIndex = parseValue(bufferIndex, memberName, context);
+               setMember(context, valueDeque.removeLast() /* member value */, memberName);
                continue;
-            case '}':
+            case CLOSE_CURLY:
                return bufferIndex;
             default:
                bufferIndex++;
@@ -118,7 +128,7 @@ loop:    while (true) {
 
    protected abstract Class<?> getMemberType(String memberName, Class<?> valueType);
    
-   private int parseValue(int bufferIndex, Object target, Class<?> targetType)
+   private int parseValue(int bufferIndex, String memberName, Context context) //, Class<?> targetType)
    {
       try {
 loop:    while (true) {
@@ -131,7 +141,7 @@ loop:    while (true) {
             }
 
             switch (byteBuffer[bufferIndex]) {
-            case '"':
+            case QUOTE:
                bufferIndex++;
                bufferIndex = parseString(bufferIndex);
                return bufferIndex;
@@ -147,10 +157,10 @@ loop:    while (true) {
                bufferIndex++;
                valueDeque.add(null);
                break loop;
-            case '{':
-               bufferIndex = parseObject(bufferIndex, targetType);
+            case OPEN_CURLY:
+               bufferIndex = parseObject(bufferIndex, context);
                break loop;
-            case '[':
+            case OPEN_BRACKET:
                bufferIndex++;
                bufferIndex = parseArray(bufferIndex);
                break loop;
@@ -168,9 +178,9 @@ loop:    while (true) {
 
    private int parseArray(int bufferIndex)
    {
-      valueDeque.add(Void.TYPE);
+      // valueDeque.add(Void.TYPE);
       for (; bufferIndex < bufferLimit; bufferIndex++) {
-         if (byteBuffer[bufferIndex] == ']') {
+         if (byteBuffer[bufferIndex] == CLOSE_BRACKET) {
             return bufferIndex;
          }
       }
@@ -241,10 +251,10 @@ loop:    while (true) {
          }
 
          switch (byteBuffer[bufferIndex]) {
-         case '\t':
-         case '\n':
-         case '\r':
-         case ' ': // skip whitespace
+         case TAB:
+         case NEWLINE:
+         case CR:
+         case SPACE: // skip whitespace
             bufferIndex++;
             continue;
          default:

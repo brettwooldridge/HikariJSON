@@ -2,7 +2,6 @@ package com.zaxxer.hikari.json;
 
 import java.util.List;
 
-@SuppressWarnings("unused")
 public class MenuBar
 {
    public Menu menu;
