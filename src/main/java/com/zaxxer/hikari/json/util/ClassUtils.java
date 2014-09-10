@@ -27,4 +27,10 @@ public final class ClassUtils
    {
       // private constructor
    }
+
+   public static Clazz reflect(Class<?> targetClass)
+   {
+      Clazz clazz = new Clazz(targetClass);
+      return clazz;
+   }
 }

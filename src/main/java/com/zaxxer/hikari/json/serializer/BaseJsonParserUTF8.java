@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayDeque;
 
+import com.zaxxer.hikari.json.util.ClassUtils;
+import com.zaxxer.hikari.json.util.Clazz;
+
 public abstract class BaseJsonParserUTF8
 {
    protected static final char CR = '\r';
@@ -37,6 +40,8 @@ public abstract class BaseJsonParserUTF8
    public <T> T parseObject(InputStream src, Class<T> valueType)
    {
       source = src;
+
+      Clazz reflect = ClassUtils.reflect(valueType);
 
       parseObject(0, valueType);
       return (T) valueDeque.removeLast();
