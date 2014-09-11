@@ -5,9 +5,9 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 
-public class Clazz
+public final class Clazz
 {
-   private Class<?> actualClass;
+   private final Class<?> actualClass;
    private final Map<String, Phield> fields;
 
    public Clazz(Class<?> clazz)
@@ -29,7 +29,7 @@ public class Clazz
       return actualClass;
    }
 
-   public Phield getPhield(String name) {
+   public Phield getPhield(final String name) {
       return fields.get(name);
    }
 

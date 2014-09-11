@@ -5,6 +5,7 @@ import static com.zaxxer.hikari.json.util.Utf8Utils.seekBackUtf8Boundary;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.util.ArrayDeque;
 import java.util.Collection;
 
@@ -24,13 +25,20 @@ public abstract class BaseJsonParserUTF8
    protected static final char OPEN_BRACKET = '[';
    protected static final char CLOSE_BRACKET = ']';
 
+   private static final Charset UTF8;
+
    private final int BUFFER_SIZE = 16384;
 
    private InputStream source;
    private byte[] byteBuffer;
    private int bufferLimit;
 
-   protected ArrayDeque<Object> valueDeque;
+   protected final ArrayDeque<Object> valueDeque;
+
+   static
+   {
+      UTF8 = Charset.forName("UTF-8");
+   }
 
    public BaseJsonParserUTF8() {
       byteBuffer = new byte[BUFFER_SIZE];
@@ -38,7 +46,7 @@ public abstract class BaseJsonParserUTF8
    }
 
    @SuppressWarnings("unchecked")
-   public <T> T parseObject(InputStream src, Class<T> valueType)
+   final public <T> T parseObject(final InputStream src, final Class<T> valueType)
    {
       source = src;
 
@@ -55,46 +63,12 @@ public abstract class BaseJsonParserUTF8
       }
    }
 
-   protected abstract void setMember(Context context, String memberName, Object value);
+   protected abstract void setMember(final Context context, final String memberName, final Object value);
 
-   private int parseObject(int bufferIndex, Context context)
-   {
-      try {
-         loop: while (true) {
-            bufferIndex = skipWhitespace(bufferIndex);
-
-            if (bufferIndex == bufferLimit) {
-               if ((bufferIndex = fillBuffer()) == -1) {
-                  break;
-               }
-            }
-
-            switch (byteBuffer[bufferIndex]) {
-            case OPEN_CURLY:
-               bufferIndex++;
-               bufferIndex = parseMembers(bufferIndex, context);
-               continue;
-            case CLOSE_CURLY:
-               bufferIndex++;
-               break loop;
-            default:
-               bufferIndex++;
-            }
-         }
-
-         return bufferIndex;
-      }
-      catch (Exception e) {
-         throw new RuntimeException(e);
-      }
-   }
-
-   private int parseMembers(int bufferIndex, Context context)
+   private int parseObject(int bufferIndex, final Context context)
    {
       try {
          while (true) {
-            bufferIndex = skipWhitespace(bufferIndex);
-
             if (bufferIndex == bufferLimit) {
                if ((bufferIndex = fillBuffer()) == -1) {
                   throw new RuntimeException("Insufficent data.");
@@ -102,17 +76,43 @@ public abstract class BaseJsonParserUTF8
             }
 
             switch (byteBuffer[bufferIndex]) {
-            case QUOTE:
+            case OPEN_CURLY:
+               bufferIndex = parseMembers(++bufferIndex, context);
+               continue;
+            case CLOSE_CURLY:
+               return ++bufferIndex;
+            default:
                bufferIndex++;
-               bufferIndex = parseString(bufferIndex); // member name
+            }
+         }
+      }
+      catch (Exception e) {
+         throw new RuntimeException(e);
+      }
+   }
+
+   private int parseMembers(int bufferIndex, final Context context)
+   {
+      int limit = bufferLimit;
+      try {
+         while (true) {
+            if (bufferIndex == limit) {
+               if ((bufferIndex = fillBuffer()) == -1) {
+                  throw new RuntimeException("Insufficent data.");
+               }
+               limit = bufferLimit;
+            }
+
+            switch (byteBuffer[bufferIndex]) {
+            case QUOTE:
+               bufferIndex = parseString(++bufferIndex); // member name
                continue;
             case COLON:
-               bufferIndex++;
-               String memberName = (String) valueDeque.removeLast();
+               final String memberName = (String) valueDeque.removeLast();
 
                Context nextContext = null;
-               if (context.targetType != null) {
-                  Phield phield = context.targetType.getPhield(memberName);
+               if (context.clazz != null) {
+                  final Phield phield = context.clazz.getPhield(memberName);
                   if (!phield.isPrimitive) {
                      nextContext = new Context(phield);
                      nextContext.createInstance();
@@ -120,7 +120,7 @@ public abstract class BaseJsonParserUTF8
                   }                  
                }
 
-               bufferIndex = parseValue(bufferIndex, context, nextContext);
+               bufferIndex = parseValue(++bufferIndex, context, nextContext);
                setMember(context, memberName, valueDeque.removeLast() /* member value */);
                continue;
             case CLOSE_CURLY:
@@ -135,12 +135,10 @@ public abstract class BaseJsonParserUTF8
       }
    }
 
-   private int parseValue(int bufferIndex, Context context, Context nextContext)
+   private int parseValue(int bufferIndex, final Context context, final Context nextContext)
    {
       try {
-         loop: while (true) {
-            bufferIndex = skipWhitespace(bufferIndex);
-
+         while (true) {
             if (bufferIndex == bufferLimit) {
                if ((bufferIndex = fillBuffer()) == -1) {
                   throw new RuntimeException("Insufficent data.");
@@ -149,46 +147,34 @@ public abstract class BaseJsonParserUTF8
 
             switch (byteBuffer[bufferIndex]) {
             case QUOTE:
-               bufferIndex++;
-               bufferIndex = parseString(bufferIndex);
-               return bufferIndex;
+               return parseString(++bufferIndex);
             case 't':
-               bufferIndex++;
                valueDeque.add(true);
-               break loop;
+               return ++bufferIndex;
             case 'f':
-               bufferIndex++;
                valueDeque.add(false);
-               break loop;
+               return ++bufferIndex;
             case 'n':
-               bufferIndex++;
                valueDeque.add(null);
-               break loop;
+               return ++bufferIndex;
             case OPEN_CURLY:
-               bufferIndex = parseObject(bufferIndex, nextContext);
-               break loop;
+               return parseObject(bufferIndex, nextContext);
             case OPEN_BRACKET:
-               bufferIndex++;
-               bufferIndex = parseArray(bufferIndex, nextContext);
-               break loop;
+               return parseArray(++bufferIndex, nextContext);
             default:
                bufferIndex++;
             }
          }
-
-         return bufferIndex;
       }
       catch (Exception e) {
          throw new RuntimeException(e);
       }
    }
 
-   private int parseArray(int bufferIndex, Context context)
+   private int parseArray(int bufferIndex, final Context context)
    {
       try {
-         loop: while (true) {
-            bufferIndex = skipWhitespace(bufferIndex);
-
+         while (true) {
             if (bufferIndex == bufferLimit) {
                if ((bufferIndex = fillBuffer()) == -1) {
                   throw new RuntimeException("Insufficent data.");
@@ -196,15 +182,18 @@ public abstract class BaseJsonParserUTF8
             }
 
             switch (byteBuffer[bufferIndex]) {
+            case TAB:
+            case NEWLINE:
+            case CR:
+            case SPACE:
             case COMMA:
                bufferIndex++;
-               continue;
+               break;
             case CLOSE_BRACKET:
-               bufferIndex++;
-               break loop;
+               return ++bufferIndex;
             default:
                Context nextContext = null;
-               final Phield phield = context.targetPhield;
+               final Phield phield = context.phield;
                if (phield != null) {
                   if (phield.isCollection || phield.isArray) {
                      nextContext = new Context(phield.getCollectionParameterClazz1());
@@ -219,8 +208,6 @@ public abstract class BaseJsonParserUTF8
                collection.add(valueDeque.removeLast() /* member value */);
             }
          }
-
-         return bufferIndex; 
       }
       catch (Exception e) {
          throw new RuntimeException(e);
@@ -255,7 +242,7 @@ public abstract class BaseJsonParserUTF8
             int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
             if (newIndex > 0) {
                bufferIndex = newIndex + 1;
-               valueDeque.add(new String(byteBuffer, startIndex, (newIndex - startIndex), "UTF-8"));
+               valueDeque.add(new String(byteBuffer, startIndex, (newIndex - startIndex), UTF8));
                return bufferIndex;
             }
             else if (newIndex == -1) {
@@ -282,22 +269,20 @@ public abstract class BaseJsonParserUTF8
    private int skipWhitespace(int bufferIndex) throws IOException
    {
       int limit = bufferLimit;
+      byte[] localBuffer = byteBuffer;
       while (true) {
          if (bufferIndex == limit) {
             if ((bufferIndex = fillBuffer()) == -1) {
                throw new RuntimeException("Insufficent data.");
             }
             limit = bufferLimit;
+            localBuffer = byteBuffer;
          }
 
-         switch (byteBuffer[bufferIndex]) {
-         case TAB:
-         case NEWLINE:
-         case CR:
-         case SPACE: // skip whitespace
+         if (localBuffer[bufferIndex] <= SPACE) {
             bufferIndex++;
-            continue;
-         default:
+         }
+         else {
             return bufferIndex;
          }
       }

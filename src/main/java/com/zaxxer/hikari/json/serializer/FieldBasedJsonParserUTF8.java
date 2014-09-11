@@ -8,7 +8,7 @@ public class FieldBasedJsonParserUTF8 extends BaseJsonParserUTF8
    protected void setMember(final Context context, final String memberName, final Object value)
    {
       try {
-         final Phield phield = context.targetType.getPhield(memberName);
+         final Phield phield = context.clazz.getPhield(memberName);
          phield.field.set(context.target, (value == Void.TYPE ? null : value));
       }
       catch (SecurityException | IllegalArgumentException | IllegalAccessException e) {

@@ -7,31 +7,33 @@ import com.zaxxer.hikari.json.util.Phield;
 public class Context
 {
    public Object target;
-   public Clazz targetType;
-   public Phield targetPhield;
+   public final Clazz clazz;
+   public final Phield phield;
    
-   public Context(Class<?> targetType)
+   public Context(final Class<?> targetType)
    {
-      this.targetType = ClassUtils.reflect(targetType);
+      this.clazz = ClassUtils.reflect(targetType);
+      this.phield = null;
    }
 
-   public Context(Clazz clazz)
+   public Context(final Clazz clazz)
    {
-      this.targetType = clazz;
+      this.clazz = clazz;
+      this.phield = null;
    }
 
-   public Context(Phield phield) {
-      this.targetPhield = phield;
-      this.targetType = phield.clazz;
+   public Context(final Phield phield) {
+      this.phield = phield;
+      this.clazz = phield.clazz;
    }
 
    public void createInstance() throws InstantiationException, IllegalAccessException
    {
-      if (targetType != null) {
-         target = targetType.newInstance();
+      if (clazz != null) {
+         target = clazz.newInstance();
       }
       else {
-         target = targetPhield.newInstance();
+         target = phield.newInstance();
       }
    }
 }
