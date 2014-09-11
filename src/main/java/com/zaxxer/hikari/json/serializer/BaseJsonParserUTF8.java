@@ -218,15 +218,9 @@ public abstract class BaseJsonParserUTF8
    public int parseString(int bufferIndex)
    {
       try {
-         if (bufferIndex >= bufferLimit) {
-            if ((bufferIndex = fillBuffer()) == -1) {
-               throw new RuntimeException("Insufficent data.");
-            }
-         }
-
-         int startIndex = bufferIndex;
+         final int startIndex = bufferIndex;
          while (true) {
-            if (bufferIndex >= bufferLimit) {
+            if (bufferIndex == bufferLimit) {
                final byte[] newArray = new byte[bufferLimit * 2];
                System.arraycopy(byteBuffer, 0, newArray, 0, byteBuffer.length);
                byteBuffer = newArray;
@@ -239,13 +233,13 @@ public abstract class BaseJsonParserUTF8
                bufferIndex = seekBackUtf8Boundary(byteBuffer, bufferIndex);
             }
 
-            int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
+            final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
             if (newIndex > 0) {
-               bufferIndex = newIndex + 1;
                valueDeque.add(new String(byteBuffer, startIndex, (newIndex - startIndex), UTF8));
+               bufferIndex = newIndex + 1;
                return bufferIndex;
             }
-            else if (newIndex == -1) {
+            else {
                bufferIndex = bufferLimit;
             }
          }
