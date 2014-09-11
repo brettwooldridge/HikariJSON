@@ -106,7 +106,7 @@ public abstract class BaseJsonParserUTF8
             switch (byteBuffer[bufferIndex]) {
             case QUOTE:
                bufferIndex = parseString(++bufferIndex); // member name
-               continue;
+               break;
             case COLON:
                final String memberName = (String) valueDeque.removeLast();
 
@@ -122,7 +122,7 @@ public abstract class BaseJsonParserUTF8
 
                bufferIndex = parseValue(++bufferIndex, context, nextContext);
                setMember(context, memberName, valueDeque.removeLast() /* member value */);
-               continue;
+               break;
             case CLOSE_CURLY:
                return bufferIndex;
             default:
