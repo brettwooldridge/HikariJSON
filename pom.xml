@@ -134,8 +134,8 @@
             <configuration>
                <instructions>
                   <Bundle-Name>HikariJSON</Bundle-Name>
-                  <Export-Package>com.zaxxer.hikari.json</Export-Package>
-                  <Private-Package>com.zaxxer.hikari.internal.*</Private-Package>
+                  <Export-Package>com.zaxxer.hikari.json,com.zaxxer.hikari.json.serializer</Export-Package>
+                  <Private-Package>com.zaxxer.hikari.json.util.*</Private-Package>
                   <Import-Package>
                      javassist.*,
                      org.slf4j,

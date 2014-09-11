@@ -8,5 +8,4 @@
             {"value": "Close", "onclick": "CloseDoc()"}
         ]
     }
-
 }}
