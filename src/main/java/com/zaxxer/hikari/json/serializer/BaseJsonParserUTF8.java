@@ -6,9 +6,9 @@ import static com.zaxxer.hikari.json.util.Utf8Utils.seekBackUtf8Boundary;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayDeque;
+import java.util.Collection;
 
-import com.zaxxer.hikari.json.util.ClassUtils;
-import com.zaxxer.hikari.json.util.Clazz;
+import com.zaxxer.hikari.json.util.Phield;
 
 public abstract class BaseJsonParserUTF8
 {
@@ -17,6 +17,7 @@ public abstract class BaseJsonParserUTF8
    protected static final char SPACE = ' ';
    protected static final char QUOTE = '"';
    protected static final char COLON = ':';
+   protected static final char COMMA = ',';
    protected static final char NEWLINE = '\n';
    protected static final char OPEN_CURLY = '{';
    protected static final char CLOSE_CURLY = '}';
@@ -41,30 +42,25 @@ public abstract class BaseJsonParserUTF8
    {
       source = src;
 
-      Clazz reflect = ClassUtils.reflect(valueType);
-
-      parseObject(0, valueType);
-      return (T) valueDeque.removeLast();
-   }
-
-   private int parseObject(int bufferIndex, Class<?> targetType)
-   {
       try {
-         Context context = new Context(targetType);
+         Context context = new Context(valueType);
          context.createInstance();
-         valueDeque.add(context);
-         bufferIndex = parseObject(bufferIndex, context);
-         return bufferIndex;
+         valueDeque.add(context.target);
+
+         parseObject(0, context);
+         return (T) valueDeque.removeLast();
       }
       catch (InstantiationException | IllegalAccessException e) {
          throw new RuntimeException(e);
       }
    }
 
+   protected abstract void setMember(Context context, String memberName, Object value);
+
    private int parseObject(int bufferIndex, Context context)
    {
       try {
-loop:    while (true) {
+         loop: while (true) {
             bufferIndex = skipWhitespace(bufferIndex);
 
             if (bufferIndex == bufferLimit) {
@@ -89,8 +85,8 @@ loop:    while (true) {
          return bufferIndex;
       }
       catch (Exception e) {
-         throw new RuntimeException();
-      }      
+         throw new RuntimeException(e);
+      }
    }
 
    private int parseMembers(int bufferIndex, Context context)
@@ -113,9 +109,19 @@ loop:    while (true) {
             case COLON:
                bufferIndex++;
                String memberName = (String) valueDeque.removeLast();
-//               Class<?> memberType = getMemberType(memberName, context.getClass());
-               bufferIndex = parseValue(bufferIndex, memberName, context);
-               setMember(context, valueDeque.removeLast() /* member value */, memberName);
+
+               Context nextContext = null;
+               if (context.targetType != null) {
+                  Phield phield = context.targetType.getPhield(memberName);
+                  if (!phield.isPrimitive) {
+                     nextContext = new Context(phield);
+                     nextContext.createInstance();
+                     valueDeque.add(nextContext.target);
+                  }                  
+               }
+
+               bufferIndex = parseValue(bufferIndex, context, nextContext);
+               setMember(context, memberName, valueDeque.removeLast() /* member value */);
                continue;
             case CLOSE_CURLY:
                return bufferIndex;
@@ -125,18 +131,14 @@ loop:    while (true) {
          }
       }
       catch (Exception e) {
-         throw new RuntimeException();
-      }      
+         throw new RuntimeException(e);
+      }
    }
 
-   protected abstract void setMember(Object target, Object value, Object member);
-
-   protected abstract Class<?> getMemberType(String memberName, Class<?> valueType);
-   
-   private int parseValue(int bufferIndex, String memberName, Context context) //, Class<?> targetType)
+   private int parseValue(int bufferIndex, Context context, Context nextContext)
    {
       try {
-loop:    while (true) {
+         loop: while (true) {
             bufferIndex = skipWhitespace(bufferIndex);
 
             if (bufferIndex == bufferLimit) {
@@ -163,11 +165,11 @@ loop:    while (true) {
                valueDeque.add(null);
                break loop;
             case OPEN_CURLY:
-               bufferIndex = parseObject(bufferIndex, context);
+               bufferIndex = parseObject(bufferIndex, nextContext);
                break loop;
             case OPEN_BRACKET:
                bufferIndex++;
-               bufferIndex = parseArray(bufferIndex);
+               bufferIndex = parseArray(bufferIndex, nextContext);
                break loop;
             default:
                bufferIndex++;
@@ -177,20 +179,53 @@ loop:    while (true) {
          return bufferIndex;
       }
       catch (Exception e) {
-         throw new RuntimeException();
-      }      
+         throw new RuntimeException(e);
+      }
    }
 
-   private int parseArray(int bufferIndex)
+   private int parseArray(int bufferIndex, Context context)
    {
-      // valueDeque.add(Void.TYPE);
-      for (; bufferIndex < bufferLimit; bufferIndex++) {
-         if (byteBuffer[bufferIndex] == CLOSE_BRACKET) {
-            return bufferIndex;
+      try {
+         loop: while (true) {
+            bufferIndex = skipWhitespace(bufferIndex);
+
+            if (bufferIndex == bufferLimit) {
+               if ((bufferIndex = fillBuffer()) == -1) {
+                  throw new RuntimeException("Insufficent data.");
+               }
+            }
+
+            switch (byteBuffer[bufferIndex]) {
+            case COMMA:
+               bufferIndex++;
+               continue;
+            case CLOSE_BRACKET:
+               bufferIndex++;
+               break loop;
+            default:
+               Context nextContext = null;
+               final Phield phield = context.targetPhield;
+               if (phield != null) {
+                  if (phield.isCollection || phield.isArray) {
+                     nextContext = new Context(phield.getCollectionParameterClazz1());
+                     nextContext.createInstance();
+                     valueDeque.add(nextContext.target);
+                  }                  
+               }
+
+               bufferIndex = parseValue(bufferIndex, context, nextContext);
+               @SuppressWarnings("unchecked")
+               Collection<Object> collection = ((Collection<Object>) context.target);
+               collection.add(valueDeque.removeLast() /* member value */);
+            }
          }
+
+         return bufferIndex; 
+      }
+      catch (Exception e) {
+         throw new RuntimeException(e);
       }
 
-      throw new RuntimeException("Insufficent data.");
    }
 
    public int parseString(int bufferIndex)
@@ -201,7 +236,7 @@ loop:    while (true) {
                throw new RuntimeException("Insufficent data.");
             }
          }
-         
+
          int startIndex = bufferIndex;
          while (true) {
             if (bufferIndex >= bufferLimit) {

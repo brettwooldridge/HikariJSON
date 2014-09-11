@@ -1,45 +1,17 @@
 package com.zaxxer.hikari.json.serializer;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
+import com.zaxxer.hikari.json.util.Phield;
 
 public class FieldBasedJsonParserUTF8 extends BaseJsonParserUTF8
 {
    @Override
-   protected void setMember(Object target, Object value, Object member)
+   protected void setMember(final Context context, final String memberName, final Object value)
    {
       try {
-         Field declaredField = target.getClass().getDeclaredField((String) member);
-         declaredField.setAccessible(true);
-         if (value == Void.TYPE) {
-            declaredField.set(target, null);
-         }
-         else {
-            declaredField.set(target, value);
-         }
-         /*
-          * Types.newParameterizedType(Collection.class, fruit.getClass())
-          */
+         final Phield phield = context.targetType.getPhield(memberName);
+         phield.field.set(context.target, (value == Void.TYPE ? null : value));
       }
-      catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
-         throw new RuntimeException(e);
-      }
-   }
-
-   @Override
-   protected Class<?> getMemberType(String memberName, Class<?> valueType)
-   {
-      try {
-         Field declaredField = valueType.getDeclaredField(memberName);
-         Type genericType = declaredField.getGenericType();
-         if (genericType instanceof ParameterizedType) {
-            // return (Class<?>) ((ParameterizedType) genericType).getActualTypeArguments()[0];
-            return (Class<?>) ((ParameterizedType) genericType).getRawType();
-         }
-         return declaredField.getType();
-      }
-      catch (NoSuchFieldException | SecurityException e) {
+      catch (SecurityException | IllegalArgumentException | IllegalAccessException e) {
          throw new RuntimeException(e);
       }
    }

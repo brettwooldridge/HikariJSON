@@ -22,6 +22,8 @@ public class TestParser1
          Assert.assertEquals(menuBar.menu.id, "file");
          Assert.assertEquals(menuBar.menu.value, "File");
          Assert.assertNotNull(menuBar.menu.popup);
+         Assert.assertNotNull(menuBar.menu.popup.menuitem);
+         Assert.assertSame(3, menuBar.menu.popup.menuitem.size());
       }
    }
 }
