@@ -3,9 +3,7 @@ package com.zaxxer.hikari.json;
 import java.util.Arrays;
 import java.util.HashSet;
 
-import com.zaxxer.hikari.json.serializer.AMAVFieldJsonParser;
-import com.zaxxer.hikari.json.serializer.AMU8VFieldJsonParser;
-import com.zaxxer.hikari.json.serializer.Utf8FieldJsonParser;
+import com.zaxxer.hikari.json.serializer.BaseJsonParser;
 
 
 public class JsonFactory
@@ -64,24 +62,12 @@ public class JsonFactory
        */
       public ObjectMapper create()
       {
-         if (options.contains(Option.MEMBERS_ASCII))
+         if (options.contains(Option.FIELD_ACCESS))
          {
-            if (options.contains(Option.VALUES_UTF8))
-            {
-               return new AMU8VFieldJsonParser();
-            }
-            else
-            {
-               return new AMAVFieldJsonParser();               
-            }
+               return new BaseJsonParser(options.toArray(new Option[0]));               
          }
 
-         if (options.contains(Option.MEMBERS_UTF8))
-         {
-            return new Utf8FieldJsonParser();
-         }
-
-         return new Utf8FieldJsonParser();
+         throw new UnsupportedOperationException();
       }
    }
 }

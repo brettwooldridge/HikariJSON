@@ -1,14 +1,21 @@
 package com.zaxxer.hikari.json.serializer;
 
+import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuoteUTF8;
+import static com.zaxxer.hikari.json.util.Utf8Utils.seekBackUtf8Boundary;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 
+import com.zaxxer.hikari.json.JsonFactory.Option;
 import com.zaxxer.hikari.json.ObjectMapper;
 import com.zaxxer.hikari.json.util.Phield;
+import com.zaxxer.hikari.json.util.Utf8Utils;
 
-public abstract class BaseJsonParser implements ObjectMapper
+public final class BaseJsonParser implements ObjectMapper
 {
    protected static final char CR = '\r';
    protected static final char TAB = '\t';
@@ -22,6 +29,9 @@ public abstract class BaseJsonParser implements ObjectMapper
    protected static final char OPEN_BRACKET = '[';
    protected static final char CLOSE_BRACKET = ']';
 
+   private final boolean isAsciiMembers;
+   private final boolean isAsciiValues;
+
    private final int BUFFER_SIZE = 16384;
 
    protected InputStream source;
@@ -30,9 +40,13 @@ public abstract class BaseJsonParser implements ObjectMapper
 
    protected final ArrayDeque<Object> valueDeque;
 
-   public BaseJsonParser() {
+   public BaseJsonParser(Option...options) {
       byteBuffer = new byte[BUFFER_SIZE];
       valueDeque = new ArrayDeque<>(32);
+
+      HashSet<Option> set = new HashSet<>(Arrays.asList(options));
+      isAsciiMembers = set.contains(Option.MEMBERS_ASCII);
+      isAsciiValues = set.contains(Option.VALUES_ASCII);
    }
 
    @Override
@@ -53,12 +67,6 @@ public abstract class BaseJsonParser implements ObjectMapper
          throw new RuntimeException(e);
       }
    }
-
-   abstract protected void setMember(final Context context, final String memberName, final Object value);
-
-   abstract protected int parseStringValue(int bufferIndex);
-   
-   abstract protected int parseMemberName(int bufferIndex);
 
    private int parseObject(int bufferIndex, final Context context)
    {
@@ -100,7 +108,7 @@ public abstract class BaseJsonParser implements ObjectMapper
 
             switch (byteBuffer[bufferIndex]) {
             case QUOTE:
-               bufferIndex = parseMemberName(++bufferIndex);
+               bufferIndex = (isAsciiMembers ? parseAsciiString(++bufferIndex) : parseString(++bufferIndex));
                break;
             case COLON:
                final String memberName = (String) valueDeque.removeLast();
@@ -113,10 +121,13 @@ public abstract class BaseJsonParser implements ObjectMapper
                      nextContext.createInstance();
                      valueDeque.add(nextContext.target);
                   }                  
+                  bufferIndex = parseValue(++bufferIndex, context, nextContext);
+                  setMember(context.target, phield, valueDeque.removeLast() /* member value */);
                }
-
-               bufferIndex = parseValue(++bufferIndex, context, nextContext);
-               setMember(context, memberName, valueDeque.removeLast() /* member value */);
+               else {
+                  bufferIndex = parseValue(++bufferIndex, context, nextContext);
+                  setMember(context, memberName, valueDeque.removeLast() /* member value */);
+               }
                break;
             case CLOSE_CURLY:
                return bufferIndex;
@@ -142,7 +153,7 @@ public abstract class BaseJsonParser implements ObjectMapper
 
             switch (byteBuffer[bufferIndex]) {
             case QUOTE:
-               return parseStringValue(++bufferIndex);
+               return (isAsciiValues ? parseAsciiString(++bufferIndex) : parseString(++bufferIndex));
             case 't':
                valueDeque.add(true);
                return ++bufferIndex;
@@ -208,6 +219,83 @@ public abstract class BaseJsonParser implements ObjectMapper
          throw new RuntimeException(e);
       }
 
+   }
+
+   private int parseString(int bufferIndex)
+   {
+      try {
+         final int startIndex = bufferIndex;
+         while (true) {
+            final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
+            if (newIndex > 0) {
+               valueDeque.add(new String(byteBuffer, startIndex, (newIndex - startIndex), "UTF-8"));
+               return newIndex + 1;
+            }
+
+            final byte[] newArray = new byte[bufferLimit * 2];
+            System.arraycopy(byteBuffer, 0, newArray, 0, byteBuffer.length);
+            byteBuffer = newArray;
+
+            int read = source.read(byteBuffer, bufferIndex, byteBuffer.length - bufferIndex);
+            if (read < 0) {
+               throw new RuntimeException("Insufficent data.");
+            }
+
+            bufferIndex = seekBackUtf8Boundary(byteBuffer, bufferIndex);
+         }
+      }
+      catch (Exception e) {
+         throw new RuntimeException();
+      }
+   }
+
+   private int parseAsciiString(int bufferIndex)
+   {
+      try {
+         final int startIndex = bufferIndex;
+         while (true) {
+            final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
+            if (newIndex > 0) {
+               valueDeque.add(Utf8Utils.fastTrackAsciiDecode(byteBuffer, startIndex, (newIndex - startIndex)));
+               return newIndex + 1;
+            }
+
+            final byte[] newArray = new byte[bufferLimit * 2];
+            System.arraycopy(byteBuffer, 0, newArray, 0, byteBuffer.length);
+            byteBuffer = newArray;
+
+            int read = source.read(byteBuffer, bufferIndex, byteBuffer.length - bufferIndex);
+            if (read < 0) {
+               throw new RuntimeException("Insufficent data.");
+            }
+
+            bufferIndex = seekBackUtf8Boundary(byteBuffer, bufferIndex);
+         }
+      }
+      catch (Exception e) {
+         throw new RuntimeException();
+      }
+   }
+
+   private void setMember(final Context context, final String memberName, final Object value)
+   {
+      try {
+         final Phield phield = context.clazz.getPhield(memberName);
+         phield.field.set(context.target, (value == Void.TYPE ? null : value));
+      }
+      catch (SecurityException | IllegalArgumentException | IllegalAccessException e) {
+         throw new RuntimeException(e);
+      }
+   }
+
+   private void setMember(final Object target, final Phield phield, final Object value)
+   {
+      try {
+         phield.field.set(target, (value == Void.TYPE ? null : value));
+      }
+      catch (SecurityException | IllegalArgumentException | IllegalAccessException e) {
+         throw new RuntimeException(e);
+      }
    }
 
    final protected int fillBuffer() throws IOException
