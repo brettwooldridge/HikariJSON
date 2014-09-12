@@ -19,7 +19,6 @@ package com.zaxxer.hikari.json;
 
 
 import java.io.InputStream;
-import java.io.Reader;
 import java.io.Writer;
 import java.util.Collection;
 
@@ -42,7 +41,7 @@ public interface ObjectMapper
      * @param valueType the type of the value to deserialize
      * @return the deserialized Java object
      */
-    <T> T readValue(String src, Class<T> valueType);
+    // <T> T readValue(String src, Class<T> valueType);
 
     /**
      * Method to deserialize JSON content into a non-container
@@ -73,7 +72,7 @@ public interface ObjectMapper
      * @param componentType the type of the value to deserialize 
      * @return the deserialized Java object
      */
-    <T extends Collection<C>, C> T readValue(String src, Class<T> valueType, Class<C> componentType);
+    // <T extends Collection<C>, C> T readValue(String src, Class<T> valueType, Class<C> componentType);
 
     /**
      * Method to deserialize JSON content into a container like Set or List.
@@ -89,7 +88,7 @@ public interface ObjectMapper
      * @param componentType the type of the value to deserialize 
      * @return the deserialized Java object
      */
-    <T extends Collection<C>, C> T readValue(InputStream src, Class<T> valueType, Class<C> componentType);
+    // <T extends Collection<C>, C> T readValue(InputStream src, Class<T> valueType, Class<C> componentType);
 
     /**
      * Method that can be used to serialize any Java value as
@@ -100,7 +99,7 @@ public interface ObjectMapper
      * @param dest the destination Write to serialize the specified value to
      * @param value the value to serialize
      */
-     void writeValue(Writer dest, Object value);
+     // void writeValue(Writer dest, Object value);
 
     /**
      * Method that can be used to serialize any Java value as
@@ -110,7 +109,7 @@ public interface ObjectMapper
      * @param value the value to serialize
      * @return a String containing the serialized value object
      */
-     String writeValueAsString(Object value);
+     // String writeValueAsString(Object value);
 
 //     JsonParserAndMapper parser();
 

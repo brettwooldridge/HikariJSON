@@ -4,7 +4,7 @@ import com.zaxxer.hikari.json.util.ClassUtils;
 import com.zaxxer.hikari.json.util.Clazz;
 import com.zaxxer.hikari.json.util.Phield;
 
-public class Context
+public final class Context
 {
    public Object target;
    public final Clazz clazz;

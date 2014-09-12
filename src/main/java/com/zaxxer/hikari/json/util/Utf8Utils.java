@@ -1,8 +1,27 @@
 package com.zaxxer.hikari.json.util;
 
+import java.lang.reflect.Field;
 
+import sun.misc.Unsafe;
+
+@SuppressWarnings({ "restriction", "deprecation" })
 public final class Utf8Utils
 {
+   private static final Unsafe unsafe;
+   private static final int fieldOffset;
+
+   static
+   {
+      unsafe = UnsafeHelper.getUnsafe();
+      try {
+         Field valueField = String.class.getDeclaredField("value");
+         fieldOffset = unsafe.fieldOffset(valueField);
+      }
+      catch (NoSuchFieldException | SecurityException e) {
+         throw new RuntimeException("sun.misc.Unsafe not available");
+      }
+   }
+
    private Utf8Utils() {
       // utility class
    }
@@ -10,7 +29,7 @@ public final class Utf8Utils
    public static int findEndQuoteUTF8(final byte[] array, int index)
    {
       for (; index < array.length; index++) {
-         if (array[index] == 0x22 /* quote */ && array[index - 1] != 0x5c /* backslash */) {
+         if (array[index] == 0x22 /* quote */&& array[index - 1] != 0x5c /* backslash */) {
             return index;
          }
       }
@@ -33,4 +52,15 @@ public final class Utf8Utils
       return 0;
    }
 
+   public static String fastTrackAsciiDecode(final byte[] buf, final int offset, final int length)
+   {
+      final char[] chars = new char[length];
+      for (int i = 0, j = offset; i < length; i++, j++) {
+         chars[i] = (char) buf[j];
+      }
+
+      final String s = new String();
+      unsafe.putObject(s, fieldOffset, chars);
+      return s;
+   }
 }

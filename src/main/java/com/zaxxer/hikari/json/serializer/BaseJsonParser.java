@@ -1,17 +1,14 @@
 package com.zaxxer.hikari.json.serializer;
 
-import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuoteUTF8;
-import static com.zaxxer.hikari.json.util.Utf8Utils.seekBackUtf8Boundary;
-
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.Charset;
 import java.util.ArrayDeque;
 import java.util.Collection;
 
+import com.zaxxer.hikari.json.ObjectMapper;
 import com.zaxxer.hikari.json.util.Phield;
 
-public abstract class BaseJsonParserUTF8
+public abstract class BaseJsonParser implements ObjectMapper
 {
    protected static final char CR = '\r';
    protected static final char TAB = '\t';
@@ -25,28 +22,22 @@ public abstract class BaseJsonParserUTF8
    protected static final char OPEN_BRACKET = '[';
    protected static final char CLOSE_BRACKET = ']';
 
-   private static final Charset UTF8;
-
    private final int BUFFER_SIZE = 16384;
 
-   private InputStream source;
-   private byte[] byteBuffer;
-   private int bufferLimit;
+   protected InputStream source;
+   protected byte[] byteBuffer;
+   protected int bufferLimit;
 
    protected final ArrayDeque<Object> valueDeque;
 
-   static
-   {
-      UTF8 = Charset.forName("UTF-8");
-   }
-
-   public BaseJsonParserUTF8() {
+   public BaseJsonParser() {
       byteBuffer = new byte[BUFFER_SIZE];
       valueDeque = new ArrayDeque<>(32);
    }
 
+   @Override
    @SuppressWarnings("unchecked")
-   final public <T> T parseObject(final InputStream src, final Class<T> valueType)
+   final public <T> T readValue(final InputStream src, final Class<T> valueType)
    {
       source = src;
 
@@ -63,7 +54,11 @@ public abstract class BaseJsonParserUTF8
       }
    }
 
-   protected abstract void setMember(final Context context, final String memberName, final Object value);
+   abstract protected void setMember(final Context context, final String memberName, final Object value);
+
+   abstract protected int parseStringValue(int bufferIndex);
+   
+   abstract protected int parseMemberName(int bufferIndex);
 
    private int parseObject(int bufferIndex, final Context context)
    {
@@ -105,7 +100,7 @@ public abstract class BaseJsonParserUTF8
 
             switch (byteBuffer[bufferIndex]) {
             case QUOTE:
-               bufferIndex = parseString(++bufferIndex); // member name
+               bufferIndex = parseMemberName(++bufferIndex);
                break;
             case COLON:
                final String memberName = (String) valueDeque.removeLast();
@@ -147,7 +142,7 @@ public abstract class BaseJsonParserUTF8
 
             switch (byteBuffer[bufferIndex]) {
             case QUOTE:
-               return parseString(++bufferIndex);
+               return parseStringValue(++bufferIndex);
             case 't':
                valueDeque.add(true);
                return ++bufferIndex;
@@ -215,41 +210,7 @@ public abstract class BaseJsonParserUTF8
 
    }
 
-   public int parseString(int bufferIndex)
-   {
-      try {
-         final int startIndex = bufferIndex;
-         while (true) {
-            if (bufferIndex == bufferLimit) {
-               final byte[] newArray = new byte[bufferLimit * 2];
-               System.arraycopy(byteBuffer, 0, newArray, 0, byteBuffer.length);
-               byteBuffer = newArray;
-
-               int read = source.read(byteBuffer, bufferIndex, byteBuffer.length - bufferIndex);
-               if (read < 0) {
-                  throw new RuntimeException("Insufficent data.");
-               }
-
-               bufferIndex = seekBackUtf8Boundary(byteBuffer, bufferIndex);
-            }
-
-            final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
-            if (newIndex > 0) {
-               valueDeque.add(new String(byteBuffer, startIndex, (newIndex - startIndex), UTF8));
-               bufferIndex = newIndex + 1;
-               return bufferIndex;
-            }
-            else {
-               bufferIndex = bufferLimit;
-            }
-         }
-      }
-      catch (Exception e) {
-         throw new RuntimeException();
-      }
-   }
-
-   private int fillBuffer() throws IOException
+   final protected int fillBuffer() throws IOException
    {
       int read = source.read(byteBuffer);
       if (read > 0) {
@@ -258,27 +219,5 @@ public abstract class BaseJsonParserUTF8
       }
 
       return -1;
-   }
-
-   private int skipWhitespace(int bufferIndex) throws IOException
-   {
-      int limit = bufferLimit;
-      byte[] localBuffer = byteBuffer;
-      while (true) {
-         if (bufferIndex == limit) {
-            if ((bufferIndex = fillBuffer()) == -1) {
-               throw new RuntimeException("Insufficent data.");
-            }
-            limit = bufferLimit;
-            localBuffer = byteBuffer;
-         }
-
-         if (localBuffer[bufferIndex] <= SPACE) {
-            bufferIndex++;
-         }
-         else {
-            return bufferIndex;
-         }
-      }
    }
 }

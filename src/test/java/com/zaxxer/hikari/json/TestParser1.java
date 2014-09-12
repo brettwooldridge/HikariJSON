@@ -7,18 +7,16 @@ import java.io.InputStream;
 import org.junit.Assert;
 import org.junit.Test;
 
-import com.zaxxer.hikari.json.serializer.FieldBasedJsonParserUTF8;
-
 public class TestParser1
 {
    @Test
    public void testParser01() throws Exception
    {
-      FieldBasedJsonParserUTF8 jsonParser = new FieldBasedJsonParserUTF8();
+      ObjectMapper objectMapper = JsonFactory.create();
 
       File file = new File("src/test/resources/menu.json");
       try (InputStream is = new FileInputStream(file)) {
-         MenuBar menuBar = jsonParser.parseObject(is, MenuBar.class);
+         MenuBar menuBar = objectMapper.readValue(is, MenuBar.class);
          Assert.assertEquals(menuBar.menu.id, "file");
          Assert.assertEquals(menuBar.menu.value, "File");
          Assert.assertNotNull(menuBar.menu.popup);
