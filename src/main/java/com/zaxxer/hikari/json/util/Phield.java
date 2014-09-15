@@ -18,11 +18,14 @@ public final class Phield
    public final boolean isMap;
    public final boolean isArray;
    public final boolean isPrimitive;
+   public final long fieldOffset;
 
+   @SuppressWarnings("restriction")
    public Phield(final Field field) {
       Class<?> fieldClass = field.getType();
       this.field = field;
       this.field.setAccessible(true);
+      this.fieldOffset = UnsafeHelper.getUnsafe().objectFieldOffset(field);
       this.isCollection = Collection.class.isAssignableFrom(fieldClass);
       this.isMap = Map.class.isAssignableFrom(fieldClass);
       this.isArray = fieldClass.isArray();

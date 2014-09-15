@@ -2,6 +2,7 @@ package com.zaxxer.hikari.json.serializer;
 
 import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuoteUTF8;
 import static com.zaxxer.hikari.json.util.Utf8Utils.seekBackUtf8Boundary;
+import sun.misc.Unsafe;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,8 +14,10 @@ import java.util.HashSet;
 import com.zaxxer.hikari.json.JsonFactory.Option;
 import com.zaxxer.hikari.json.ObjectMapper;
 import com.zaxxer.hikari.json.util.Phield;
+import com.zaxxer.hikari.json.util.UnsafeHelper;
 import com.zaxxer.hikari.json.util.Utf8Utils;
 
+@SuppressWarnings("restriction")
 public final class BaseJsonParser implements ObjectMapper
 {
    protected static final char CR = '\r';
@@ -29,9 +32,9 @@ public final class BaseJsonParser implements ObjectMapper
    protected static final char OPEN_BRACKET = '[';
    protected static final char CLOSE_BRACKET = ']';
 
+   private static final Unsafe UNSAFE = UnsafeHelper.getUnsafe(); 
    private final boolean isAsciiMembers;
    private final boolean isAsciiValues;
-
    private final int BUFFER_SIZE = 16384;
 
    protected InputStream source;
@@ -99,6 +102,8 @@ public final class BaseJsonParser implements ObjectMapper
       int limit = bufferLimit;
       try {
          while (true) {
+            for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++);  // skip whitespace
+
             if (bufferIndex == limit) {
                if ((bufferIndex = fillBuffer()) == -1) {
                   throw new RuntimeException("Insufficent data.");
@@ -113,11 +118,11 @@ public final class BaseJsonParser implements ObjectMapper
             case COLON:
                final String memberName = (String) valueDeque.removeLast();
 
-               Context nextContext = null;
                if (context.clazz != null) {
                   final Phield phield = context.clazz.getPhield(memberName);
+                  Context nextContext = null;
                   if (!phield.isPrimitive) {
-                     nextContext = new Context(phield);
+                     nextContext  = new Context(phield);
                      nextContext.createInstance();
                      valueDeque.add(nextContext.target);
                   }                  
@@ -125,7 +130,7 @@ public final class BaseJsonParser implements ObjectMapper
                   setMember(context.target, phield, valueDeque.removeLast() /* member value */);
                }
                else {
-                  bufferIndex = parseValue(++bufferIndex, context, nextContext);
+                  bufferIndex = parseValue(++bufferIndex, context, null);
                   setMember(context, memberName, valueDeque.removeLast() /* member value */);
                }
                break;
@@ -163,6 +168,18 @@ public final class BaseJsonParser implements ObjectMapper
             case 'n':
                valueDeque.add(null);
                return ++bufferIndex;
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+               bufferIndex++;
+               break;
             case OPEN_CURLY:
                return parseObject(bufferIndex, nextContext);
             case OPEN_BRACKET:
@@ -179,22 +196,19 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseArray(int bufferIndex, final Context context)
    {
+      int limit = bufferLimit;
       try {
          while (true) {
-            if (bufferIndex == bufferLimit) {
+            for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++);  // skip whitespace
+
+            if (bufferIndex == limit) {
                if ((bufferIndex = fillBuffer()) == -1) {
                   throw new RuntimeException("Insufficent data.");
                }
+               limit = bufferLimit;
             }
 
             switch (byteBuffer[bufferIndex]) {
-            case TAB:
-            case NEWLINE:
-            case CR:
-            case SPACE:
-            case COMMA:
-               bufferIndex++;
-               break;
             case CLOSE_BRACKET:
                return ++bufferIndex;
             default:
@@ -281,9 +295,10 @@ public final class BaseJsonParser implements ObjectMapper
    {
       try {
          final Phield phield = context.clazz.getPhield(memberName);
-         phield.field.set(context.target, (value == Void.TYPE ? null : value));
+         // phield.field.set(context.target, (value == Void.TYPE ? null : value));
+         UNSAFE.putObject(context.target, phield.fieldOffset, (value == Void.TYPE ? null : value));
       }
-      catch (SecurityException | IllegalArgumentException | IllegalAccessException e) {
+      catch (SecurityException | IllegalArgumentException e) {
          throw new RuntimeException(e);
       }
    }
@@ -291,9 +306,10 @@ public final class BaseJsonParser implements ObjectMapper
    private void setMember(final Object target, final Phield phield, final Object value)
    {
       try {
-         phield.field.set(target, (value == Void.TYPE ? null : value));
+         // phield.field.set(target, (value == Void.TYPE ? null : value));
+         UNSAFE.putObject(target, phield.fieldOffset, (value == Void.TYPE ? null : value));
       }
-      catch (SecurityException | IllegalArgumentException | IllegalAccessException e) {
+      catch (SecurityException | IllegalArgumentException e) {
          throw new RuntimeException(e);
       }
    }

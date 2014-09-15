@@ -21,6 +21,7 @@ public final class Clazz
       for (Field field : actualClass.getDeclaredFields()) {
          if (!Modifier.isStatic(field.getModifiers())) {
             fields.put(field.getName(), new Phield(field));
+            fields.put(field.getName().toLowerCase(), new Phield(field));
          }
       }
    }

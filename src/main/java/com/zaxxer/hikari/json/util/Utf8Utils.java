@@ -29,7 +29,7 @@ public final class Utf8Utils
    public static int findEndQuoteUTF8(final byte[] array, int index)
    {
       for (; index < array.length; index++) {
-         if (array[index] == 0x22 /* quote */&& array[index - 1] != 0x5c /* backslash */) {
+         if (array[index] == 0x22 /* quote */ && array[index - 1] != 0x5c /* backslash */) {
             return index;
          }
       }
