@@ -33,7 +33,7 @@ public final class BaseJsonParser implements ObjectMapper
    protected static final char OPEN_BRACKET = '[';
    protected static final char CLOSE_BRACKET = ']';
 
-   private static final Unsafe UNSAFE = UnsafeHelper.getUnsafe(); 
+   private static final Unsafe UNSAFE = UnsafeHelper.getUnsafe();
    private final boolean isAsciiMembers;
    private final boolean isAsciiValues;
    private final int BUFFER_SIZE = 16384;
@@ -42,7 +42,7 @@ public final class BaseJsonParser implements ObjectMapper
    protected byte[] byteBuffer;
    protected int bufferLimit;
 
-   public BaseJsonParser(Option...options) {
+   public BaseJsonParser(Option... options) {
       byteBuffer = new byte[BUFFER_SIZE];
 
       HashSet<Option> set = new HashSet<>(Arrays.asList(options));
@@ -88,7 +88,8 @@ public final class BaseJsonParser implements ObjectMapper
    {
       int limit = bufferLimit;
       while (true) {
-         for (final byte[] buffer = byteBuffer; bufferIndex < buffer.length && buffer[bufferIndex] <= SPACE; bufferIndex++); // skip whitespace
+         for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
+            ; // skip whitespace
 
          if (bufferIndex == limit) {
             if ((bufferIndex = fillBuffer()) == -1) {
@@ -125,9 +126,11 @@ public final class BaseJsonParser implements ObjectMapper
          }
       }
 
+      // Now the value
       final String memberName = context.stringHolder;
       Context nextContext = null;
       final Phield phield = context.clazz.getPhield(memberName);
+      context.holderType = phield.type;
       if (phield.type == Types.OBJECT) {
          nextContext = new Context(phield);
          nextContext.createInstance();
@@ -142,8 +145,9 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseValue(int bufferIndex, final Context context, final Context nextContext)
    {
+      int limit = bufferLimit;
       while (true) {
-         for (final byte[] buffer = byteBuffer; bufferIndex < buffer.length; bufferIndex++) {
+         for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
 
             final int b = buffer[bufferIndex];
             if (b <= SPACE) {
@@ -162,7 +166,7 @@ public final class BaseJsonParser implements ObjectMapper
             case 'n':
                context.objectHolder = null;
                return ++bufferIndex;
-            case '0':
+            case '-':
             case '1':
             case '2':
             case '3':
@@ -172,7 +176,7 @@ public final class BaseJsonParser implements ObjectMapper
             case '7':
             case '8':
             case '9':
-               break;
+               return ((context.holderType & Types.INTEGRAL_TYPE) > 0) ? parseInteger(bufferIndex, context) : parseDecimal(bufferIndex, context);
             case OPEN_CURLY:
                return parseObject(bufferIndex, nextContext);
             case OPEN_BRACKET:
@@ -182,8 +186,11 @@ public final class BaseJsonParser implements ObjectMapper
             }
          }
 
-         if (bufferIndex == bufferLimit && (bufferIndex = fillBuffer()) == -1) {
-            throw new RuntimeException("Insufficent data.");
+         if (bufferIndex == limit) {
+            if ((bufferIndex = fillBuffer()) == -1) {
+               throw new RuntimeException("Insufficent data.");
+            }
+            limit = bufferLimit;
          }
       }
    }
@@ -192,7 +199,8 @@ public final class BaseJsonParser implements ObjectMapper
    {
       int limit = bufferLimit;
       while (true) {
-         for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++);  // skip whitespace
+         for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
+            ; // skip whitespace
 
          if (bufferIndex == limit) {
             if ((bufferIndex = fillBuffer()) == -1) {
@@ -211,7 +219,7 @@ public final class BaseJsonParser implements ObjectMapper
                if (phield.isCollection || phield.isArray) {
                   nextContext = new Context(phield.getCollectionParameterClazz1());
                   nextContext.createInstance();
-               }                  
+               }
             }
 
             bufferIndex = parseValue(bufferIndex, context, nextContext);
@@ -278,18 +286,154 @@ public final class BaseJsonParser implements ObjectMapper
       }
    }
 
+   private int parseInteger(int bufferIndex, Context context)
+   {
+      boolean negative = (byteBuffer[bufferIndex] == '-');
+      if (negative) {
+         ++bufferIndex;
+      }
+
+      boolean expsign = false;
+      boolean expnegative = false;
+      long value = 0;
+      int exp = 0;
+      int limit = bufferLimit;
+
+      while (true) {
+         for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
+            final int b = buffer[bufferIndex];
+            switch (b) {
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+            case '0':
+               if (expsign) {
+                  exp = (exp * 10) + (b - '0');
+               }
+               else {
+                  value = (value * 10) + (b - '0');
+               }
+               break;
+            case '.':
+               throw new RuntimeException("Expecting integer type, but encountered decimal point.");
+            case 'e':
+            case 'E':
+               expsign = true;
+               break;
+            case '-':
+               expnegative = true;
+               break;
+            default:
+
+               return bufferIndex;
+            }
+         }
+
+         if (bufferIndex == limit) {
+            if ((bufferIndex = fillBuffer()) == -1) {
+               throw new RuntimeException("Insufficent data during number parsing.");
+            }
+            limit = bufferLimit;
+         }
+      }
+   }
+
+   private int parseDecimal(int bufferIndex, Context context)
+   {
+      double d = 0.0;      // value
+      long part  = 0;      // the current part (int, float and sci parts of the number)
+      
+      boolean neg = (byteBuffer[bufferIndex] == '-');
+      if (neg) {
+         ++bufferIndex;
+      }
+
+      int limit = bufferLimit;
+
+      // integer part
+      long shift = 0;
+      outer1: while (true) {
+         try {
+            for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
+               final int b = buffer[bufferIndex];
+               if(b == '.') {
+                  shift = 1;
+               }
+               else if (b >= '0' && b <= '9') {
+                  shift *= 10;
+                  part = part * 10 + (b - '0');
+               }
+               else {
+                  break outer1;
+               }
+            }
+         }
+         finally {
+            if (bufferIndex == limit) {
+               if ((bufferIndex = fillBuffer()) == -1) {
+                  throw new RuntimeException("Insufficent data during number parsing.");
+               }
+               limit = bufferLimit;
+            }
+         }
+      }
+
+      if (neg) {
+         part *= -1;
+      }
+
+      d = shift != 0 ? (double)part / (double)shift : part;
+
+      // scientific part
+      if (byteBuffer[bufferIndex] == 'e' || byteBuffer[bufferIndex] == 'E') {
+         ++bufferIndex;
+         part = 0;
+         neg = byteBuffer[bufferIndex] == '-';
+         bufferIndex = neg ? ++bufferIndex : bufferIndex;
+         outer1: while (true) {
+            for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
+               final int b = buffer[bufferIndex];
+               if (b >= '0' && b <= '9') {
+                  part = part * 10 + (b - '0');
+                  continue;
+               }
+
+               break outer1;
+            }
+         }
+
+         d = (neg) ? d / (double)Math.pow(10, part) : d * (double)Math.pow(10, part);
+      }
+
+      context.doubleHolder = d;
+      return bufferIndex;
+   }
+
    private void setMember(final Phield phield, final Context context)
    {
       try {
          switch (phield.type) {
-            case Types.INT:
-               break;
-            case Types.STRING:
-               UNSAFE.putObject(context.target, phield.fieldOffset, context.stringHolder);
-               break;
-            case Types.OBJECT:
-               UNSAFE.putObject(context.target, phield.fieldOffset, (context.objectHolder == Void.TYPE ? null : context.objectHolder));
-               break;
+         case Types.INT:
+            UNSAFE.putInt(context.target, phield.fieldOffset, context.intHolder);
+            break;
+         case Types.FLOAT:
+            UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
+            break;
+         case Types.DOUBLE:
+            UNSAFE.putDouble(context.target, phield.fieldOffset, context.doubleHolder);
+            break;
+         case Types.STRING:
+            UNSAFE.putObject(context.target, phield.fieldOffset, context.stringHolder);
+            break;
+         case Types.OBJECT:
+            UNSAFE.putObject(context.target, phield.fieldOffset, (context.objectHolder == Void.TYPE ? null : context.objectHolder));
+            break;
          }
       }
       catch (SecurityException | IllegalArgumentException e) {
@@ -305,7 +449,7 @@ public final class BaseJsonParser implements ObjectMapper
             bufferLimit = read;
             return 0;
          }
-   
+
          return -1;
       }
       catch (IOException io) {

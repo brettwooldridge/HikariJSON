@@ -75,7 +75,7 @@ public final class Phield
          return new HashMap<Object, Object>();
       }
 
-      return field.getClass().newInstance();
+      return field.getType().newInstance();
    }
 
    public Clazz getCollectionParameterClazz1()
@@ -111,6 +111,12 @@ public final class Phield
       }
       else if (type == boolean.class) {
          return Types.BOOLEAN;
+      }
+      else if (type == float.class) {
+         return Types.FLOAT;
+      }
+      else if (type == double.class) {
+         return Types.DOUBLE;
       }
       else {
          return Types.OBJECT;

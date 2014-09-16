@@ -24,4 +24,15 @@ public class TestParser1
          Assert.assertSame(3, menuBar.menu.popup.menuitem.size());
       }
    }
+
+   @Test
+   public void testParser02() throws Exception
+   {
+      ObjectMapper objectMapper = JsonFactory.create();
+
+      File file = new File("src/test/resources/AllTypes.json");
+      try (InputStream is = new FileInputStream(file)) {
+         AllType allType = objectMapper.readValue(is, AllType.class);
+      }
+   }
 }

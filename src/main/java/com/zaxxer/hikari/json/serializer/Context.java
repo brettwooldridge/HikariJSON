@@ -10,11 +10,14 @@ public final class Context
    public final Phield phield;
 
    public Object target;
+
+   public int holderType;
    public String stringHolder;
    public Object objectHolder;
    public boolean booleanHolder;
    public int intHolder;
    public long longHolder;
+   public double doubleHolder;
    
    public Context(final Class<?> targetType)
    {
