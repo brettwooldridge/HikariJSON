@@ -227,7 +227,6 @@ public final class BaseJsonParser implements ObjectMapper
                   if (phield.isCollection || phield.isArray) {
                      nextContext = new Context(phield.getCollectionParameterClazz1());
                      nextContext.createInstance();
-                     // valueDeque.add(nextContext.target);
                   }                  
                }
 
@@ -235,7 +234,6 @@ public final class BaseJsonParser implements ObjectMapper
                @SuppressWarnings("unchecked")
                Collection<Object> collection = ((Collection<Object>) context.target);
                collection.add(nextContext.target);
-               // collection.add(valueDeque.removeLast() /* member value */);
             }
          }
       }
