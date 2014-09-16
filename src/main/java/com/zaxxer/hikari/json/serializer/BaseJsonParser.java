@@ -65,57 +65,47 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseObject(int bufferIndex, final Context context)
    {
-      try {
-         while (true) {
-            if (bufferIndex == bufferLimit) {
-               if ((bufferIndex = fillBuffer()) == -1) {
-                  throw new RuntimeException("Insufficent data.");
-               }
-            }
-
-            switch (byteBuffer[bufferIndex]) {
-            case OPEN_CURLY:
-               bufferIndex = parseMembers(++bufferIndex, context);
-               continue;
-            case CLOSE_CURLY:
-               return ++bufferIndex;
-            default:
-               bufferIndex++;
+      while (true) {
+         if (bufferIndex == bufferLimit) {
+            if ((bufferIndex = fillBuffer()) == -1) {
+               throw new RuntimeException("Insufficent data.");
             }
          }
-      }
-      catch (Exception e) {
-         throw new RuntimeException(e);
+
+         switch (byteBuffer[bufferIndex]) {
+         case OPEN_CURLY:
+            bufferIndex = parseMembers(++bufferIndex, context);
+            continue;
+         case CLOSE_CURLY:
+            return ++bufferIndex;
+         default:
+            bufferIndex++;
+         }
       }
    }
 
    private int parseMembers(int bufferIndex, final Context context)
    {
       int limit = bufferLimit;
-      try {
-         while (true) {
-            for (final byte[] buffer = byteBuffer; bufferIndex < buffer.length && buffer[bufferIndex] <= SPACE; bufferIndex++); // skip whitespace
+      while (true) {
+         for (final byte[] buffer = byteBuffer; bufferIndex < buffer.length && buffer[bufferIndex] <= SPACE; bufferIndex++); // skip whitespace
 
-            if (bufferIndex == limit) {
-               if ((bufferIndex = fillBuffer()) == -1) {
-                  throw new RuntimeException("Insufficent data.");
-               }
-               limit = bufferLimit;
+         if (bufferIndex == limit) {
+            if ((bufferIndex = fillBuffer()) == -1) {
+               throw new RuntimeException("Insufficent data.");
             }
-
-            switch (byteBuffer[bufferIndex]) {
-            case QUOTE:
-               bufferIndex = parseMember(bufferIndex, context);
-               break;
-            case CLOSE_CURLY:
-               return bufferIndex;
-            default:
-               bufferIndex++;
-            }
+            limit = bufferLimit;
          }
-      }
-      catch (Exception e) {
-         throw new RuntimeException(e);
+
+         switch (byteBuffer[bufferIndex]) {
+         case QUOTE:
+            bufferIndex = parseMember(bufferIndex, context);
+            break;
+         case CLOSE_CURLY:
+            return bufferIndex;
+         default:
+            bufferIndex++;
+         }
       }
    }
 
@@ -127,7 +117,7 @@ public final class BaseJsonParser implements ObjectMapper
       // Next character better be a colon
       while (true) {
          if (bufferIndex == bufferLimit && (bufferIndex = fillBuffer()) == -1) {
-            throw new RuntimeException("Insufficent data.");
+            throw new RuntimeException("Insufficent data.  Expecting colon after member.");
          }
 
          if (byteBuffer[bufferIndex++] == COLON) {
@@ -152,93 +142,83 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseValue(int bufferIndex, final Context context, final Context nextContext)
    {
-      try {
-         while (true) {
-            for (final byte[] buffer = byteBuffer; bufferIndex < buffer.length; bufferIndex++) {
+      while (true) {
+         for (final byte[] buffer = byteBuffer; bufferIndex < buffer.length; bufferIndex++) {
 
-               final int b = buffer[bufferIndex];
-               if (b <= SPACE) {
-                  continue;
-               }
-
-               switch (b) {
-               case QUOTE:
-                  return (isAsciiValues ? parseAsciiString(++bufferIndex, context) : parseString(++bufferIndex, context));
-               case 't':
-                  context.booleanHolder = true;
-                  return ++bufferIndex;
-               case 'f':
-                  context.booleanHolder = false;
-                  return ++bufferIndex;
-               case 'n':
-                  context.objectHolder = null;
-                  return ++bufferIndex;
-               case '0':
-               case '1':
-               case '2':
-               case '3':
-               case '4':
-               case '5':
-               case '6':
-               case '7':
-               case '8':
-               case '9':
-                  break;
-               case OPEN_CURLY:
-                  return parseObject(bufferIndex, nextContext);
-               case OPEN_BRACKET:
-                  return parseArray(++bufferIndex, nextContext);
-               default:
-                  break;
-               }
+            final int b = buffer[bufferIndex];
+            if (b <= SPACE) {
+               continue;
             }
 
-            if (bufferIndex == bufferLimit && (bufferIndex = fillBuffer()) == -1) {
-               throw new RuntimeException("Insufficent data.");
+            switch (b) {
+            case QUOTE:
+               return (isAsciiValues ? parseAsciiString(++bufferIndex, context) : parseString(++bufferIndex, context));
+            case 't':
+               context.booleanHolder = true;
+               return ++bufferIndex;
+            case 'f':
+               context.booleanHolder = false;
+               return ++bufferIndex;
+            case 'n':
+               context.objectHolder = null;
+               return ++bufferIndex;
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+               break;
+            case OPEN_CURLY:
+               return parseObject(bufferIndex, nextContext);
+            case OPEN_BRACKET:
+               return parseArray(++bufferIndex, nextContext);
+            default:
+               break;
             }
          }
-      }
-      catch (Exception e) {
-         throw new RuntimeException(e);
+
+         if (bufferIndex == bufferLimit && (bufferIndex = fillBuffer()) == -1) {
+            throw new RuntimeException("Insufficent data.");
+         }
       }
    }
 
    private int parseArray(int bufferIndex, final Context context)
    {
       int limit = bufferLimit;
-      try {
-         while (true) {
-            for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++);  // skip whitespace
+      while (true) {
+         for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++);  // skip whitespace
 
-            if (bufferIndex == limit) {
-               if ((bufferIndex = fillBuffer()) == -1) {
-                  throw new RuntimeException("Insufficent data.");
-               }
-               limit = bufferLimit;
+         if (bufferIndex == limit) {
+            if ((bufferIndex = fillBuffer()) == -1) {
+               throw new RuntimeException("Insufficent data.");
             }
-
-            switch (byteBuffer[bufferIndex]) {
-            case CLOSE_BRACKET:
-               return ++bufferIndex;
-            default:
-               Context nextContext = context;
-               final Phield phield = context.phield;
-               if (phield != null) {
-                  if (phield.isCollection || phield.isArray) {
-                     nextContext = new Context(phield.getCollectionParameterClazz1());
-                     nextContext.createInstance();
-                  }                  
-               }
-
-               bufferIndex = parseValue(bufferIndex, context, nextContext);
-               @SuppressWarnings("unchecked")
-               Collection<Object> collection = ((Collection<Object>) context.target);
-               collection.add(nextContext.target);
-            }
+            limit = bufferLimit;
          }
-      }
-      catch (Exception e) {
-         throw new RuntimeException(e);
+
+         switch (byteBuffer[bufferIndex]) {
+         case CLOSE_BRACKET:
+            return ++bufferIndex;
+         default:
+            Context nextContext = context;
+            final Phield phield = context.phield;
+            if (phield != null) {
+               if (phield.isCollection || phield.isArray) {
+                  nextContext = new Context(phield.getCollectionParameterClazz1());
+                  nextContext.createInstance();
+               }                  
+            }
+
+            bufferIndex = parseValue(bufferIndex, context, nextContext);
+            @SuppressWarnings("unchecked")
+            Collection<Object> collection = ((Collection<Object>) context.target);
+            collection.add(nextContext.target);
+         }
       }
    }
 
