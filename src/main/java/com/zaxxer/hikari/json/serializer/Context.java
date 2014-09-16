@@ -33,13 +33,18 @@ public final class Context
       this.clazz = phield.clazz;
    }
 
-   public void createInstance() throws InstantiationException, IllegalAccessException
+   public void createInstance()
    {
-      if (clazz != null) {
-         target = clazz.newInstance();
+      try {
+         if (clazz != null) {
+            target = clazz.newInstance();
+         }
+         else {
+            target = phield.newInstance();
+         }
       }
-      else {
-         target = phield.newInstance();
+      catch (InstantiationException | IllegalAccessException e) {
+         throw new RuntimeException(e);
       }
    }
 }

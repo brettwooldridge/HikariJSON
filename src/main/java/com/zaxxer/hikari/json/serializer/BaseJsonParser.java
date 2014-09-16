@@ -56,16 +56,11 @@ public final class BaseJsonParser implements ObjectMapper
    {
       source = src;
 
-      try {
-         Context context = new Context(valueType);
-         context.createInstance();
+      Context context = new Context(valueType);
+      context.createInstance();
 
-         parseObject(0, context);
-         return (T) context.target;
-      }
-      catch (InstantiationException | IllegalAccessException e) {
-         throw new RuntimeException(e);
-      }
+      parseObject(0, context);
+      return (T) context.target;
    }
 
    private int parseObject(int bufferIndex, final Context context)
@@ -99,7 +94,7 @@ public final class BaseJsonParser implements ObjectMapper
       int limit = bufferLimit;
       try {
          while (true) {
-            for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++);  // skip whitespace
+            for (final byte[] buffer = byteBuffer; bufferIndex < buffer.length && buffer[bufferIndex] <= SPACE; bufferIndex++); // skip whitespace
 
             if (bufferIndex == limit) {
                if ((bufferIndex = fillBuffer()) == -1) {
@@ -110,20 +105,7 @@ public final class BaseJsonParser implements ObjectMapper
 
             switch (byteBuffer[bufferIndex]) {
             case QUOTE:
-               bufferIndex = (isAsciiMembers ? parseAsciiString(++bufferIndex, context) : parseString(++bufferIndex, context));
-               break;
-            case COLON:
-               final String memberName = context.stringHolder;
-               Context nextContext = null;
-               final Phield phield = context.clazz.getPhield(memberName);
-               if (phield.type == Types.OBJECT) {
-                  nextContext  = new Context(phield);
-                  nextContext.createInstance();
-                  context.objectHolder = nextContext.target;
-               }
-
-               bufferIndex = parseValue(++bufferIndex, context, nextContext);
-               setMember(phield, context);
+               bufferIndex = parseMember(bufferIndex, context);
                break;
             case CLOSE_CURLY:
                return bufferIndex;
@@ -137,51 +119,82 @@ public final class BaseJsonParser implements ObjectMapper
       }
    }
 
+   private int parseMember(int bufferIndex, final Context context)
+   {
+      // Parse the member name
+      bufferIndex = (isAsciiMembers ? parseAsciiString(++bufferIndex, context) : parseString(++bufferIndex, context));
+
+      // Next character better be a colon
+      while (true) {
+         if (bufferIndex == bufferLimit && (bufferIndex = fillBuffer()) == -1) {
+            throw new RuntimeException("Insufficent data.");
+         }
+
+         if (byteBuffer[bufferIndex++] == COLON) {
+            break;
+         }
+      }
+
+      final String memberName = context.stringHolder;
+      Context nextContext = null;
+      final Phield phield = context.clazz.getPhield(memberName);
+      if (phield.type == Types.OBJECT) {
+         nextContext = new Context(phield);
+         nextContext.createInstance();
+         context.objectHolder = nextContext.target;
+      }
+
+      bufferIndex = parseValue(bufferIndex, context, nextContext);
+      setMember(phield, context);
+
+      return bufferIndex;
+   }
+
    private int parseValue(int bufferIndex, final Context context, final Context nextContext)
    {
-      int limit = bufferLimit;
-
       try {
          while (true) {
-            for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++);  // skip whitespace
+            for (final byte[] buffer = byteBuffer; bufferIndex < buffer.length; bufferIndex++) {
 
-            if (bufferIndex == limit) {
-               if ((bufferIndex = fillBuffer()) == -1) {
-                  throw new RuntimeException("Insufficent data.");
+               final int b = buffer[bufferIndex];
+               if (b <= SPACE) {
+                  continue;
                }
-               limit = bufferLimit;
+
+               switch (b) {
+               case QUOTE:
+                  return (isAsciiValues ? parseAsciiString(++bufferIndex, context) : parseString(++bufferIndex, context));
+               case 't':
+                  context.booleanHolder = true;
+                  return ++bufferIndex;
+               case 'f':
+                  context.booleanHolder = false;
+                  return ++bufferIndex;
+               case 'n':
+                  context.objectHolder = null;
+                  return ++bufferIndex;
+               case '0':
+               case '1':
+               case '2':
+               case '3':
+               case '4':
+               case '5':
+               case '6':
+               case '7':
+               case '8':
+               case '9':
+                  break;
+               case OPEN_CURLY:
+                  return parseObject(bufferIndex, nextContext);
+               case OPEN_BRACKET:
+                  return parseArray(++bufferIndex, nextContext);
+               default:
+                  break;
+               }
             }
 
-            switch (byteBuffer[bufferIndex]) {
-            case QUOTE:
-               return (isAsciiValues ? parseAsciiString(++bufferIndex, context) : parseString(++bufferIndex, context));
-            case 't':
-               context.booleanHolder = true;
-               return ++bufferIndex;
-            case 'f':
-               context.booleanHolder = false;
-               return ++bufferIndex;
-            case 'n':
-               context.objectHolder = null;
-               return ++bufferIndex;
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-               bufferIndex++;
-               break;
-            case OPEN_CURLY:
-               return parseObject(bufferIndex, nextContext);
-            case OPEN_BRACKET:
-               return parseArray(++bufferIndex, nextContext);
-            default:
-               bufferIndex++;
+            if (bufferIndex == bufferLimit && (bufferIndex = fillBuffer()) == -1) {
+               throw new RuntimeException("Insufficent data.");
             }
          }
       }
@@ -306,14 +319,19 @@ public final class BaseJsonParser implements ObjectMapper
       }
    }
 
-   final protected int fillBuffer() throws IOException
+   final protected int fillBuffer()
    {
-      int read = source.read(byteBuffer);
-      if (read > 0) {
-         bufferLimit = read;
-         return 0;
+      try {
+         int read = source.read(byteBuffer);
+         if (read > 0) {
+            bufferLimit = read;
+            return 0;
+         }
+   
+         return -1;
       }
-
-      return -1;
+      catch (IOException io) {
+         throw new RuntimeException(io);
+      }
    }
 }
