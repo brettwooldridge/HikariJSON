@@ -6,9 +6,15 @@ import com.zaxxer.hikari.json.util.Phield;
 
 public final class Context
 {
-   public Object target;
    public final Clazz clazz;
    public final Phield phield;
+
+   public Object target;
+   public String stringHolder;
+   public Object objectHolder;
+   public boolean booleanHolder;
+   public int intHolder;
+   public long longHolder;
    
    public Context(final Class<?> targetType)
    {

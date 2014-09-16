@@ -2,18 +2,19 @@ package com.zaxxer.hikari.json.serializer;
 
 import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuoteUTF8;
 import static com.zaxxer.hikari.json.util.Utf8Utils.seekBackUtf8Boundary;
-import sun.misc.Unsafe;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 
+import sun.misc.Unsafe;
+
 import com.zaxxer.hikari.json.JsonFactory.Option;
 import com.zaxxer.hikari.json.ObjectMapper;
 import com.zaxxer.hikari.json.util.Phield;
+import com.zaxxer.hikari.json.util.Types;
 import com.zaxxer.hikari.json.util.UnsafeHelper;
 import com.zaxxer.hikari.json.util.Utf8Utils;
 
@@ -41,11 +42,8 @@ public final class BaseJsonParser implements ObjectMapper
    protected byte[] byteBuffer;
    protected int bufferLimit;
 
-   protected final ArrayDeque<Object> valueDeque;
-
    public BaseJsonParser(Option...options) {
       byteBuffer = new byte[BUFFER_SIZE];
-      valueDeque = new ArrayDeque<>(32);
 
       HashSet<Option> set = new HashSet<>(Arrays.asList(options));
       isAsciiMembers = set.contains(Option.MEMBERS_ASCII);
@@ -61,10 +59,9 @@ public final class BaseJsonParser implements ObjectMapper
       try {
          Context context = new Context(valueType);
          context.createInstance();
-         valueDeque.add(context.target);
 
          parseObject(0, context);
-         return (T) valueDeque.removeLast();
+         return (T) context.target;
       }
       catch (InstantiationException | IllegalAccessException e) {
          throw new RuntimeException(e);
@@ -113,26 +110,20 @@ public final class BaseJsonParser implements ObjectMapper
 
             switch (byteBuffer[bufferIndex]) {
             case QUOTE:
-               bufferIndex = (isAsciiMembers ? parseAsciiString(++bufferIndex) : parseString(++bufferIndex));
+               bufferIndex = (isAsciiMembers ? parseAsciiString(++bufferIndex, context) : parseString(++bufferIndex, context));
                break;
             case COLON:
-               final String memberName = (String) valueDeque.removeLast();
+               final String memberName = context.stringHolder;
+               Context nextContext = null;
+               final Phield phield = context.clazz.getPhield(memberName);
+               if (phield.type == Types.OBJECT) {
+                  nextContext  = new Context(phield);
+                  nextContext.createInstance();
+                  context.objectHolder = nextContext.target;
+               }
 
-               if (context.clazz != null) {
-                  final Phield phield = context.clazz.getPhield(memberName);
-                  Context nextContext = null;
-                  if (!phield.isPrimitive) {
-                     nextContext  = new Context(phield);
-                     nextContext.createInstance();
-                     valueDeque.add(nextContext.target);
-                  }                  
-                  bufferIndex = parseValue(++bufferIndex, context, nextContext);
-                  setMember(context.target, phield, valueDeque.removeLast() /* member value */);
-               }
-               else {
-                  bufferIndex = parseValue(++bufferIndex, context, null);
-                  setMember(context, memberName, valueDeque.removeLast() /* member value */);
-               }
+               bufferIndex = parseValue(++bufferIndex, context, nextContext);
+               setMember(phield, context);
                break;
             case CLOSE_CURLY:
                return bufferIndex;
@@ -148,25 +139,30 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseValue(int bufferIndex, final Context context, final Context nextContext)
    {
+      int limit = bufferLimit;
+
       try {
          while (true) {
-            if (bufferIndex == bufferLimit) {
+            for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++);  // skip whitespace
+
+            if (bufferIndex == limit) {
                if ((bufferIndex = fillBuffer()) == -1) {
                   throw new RuntimeException("Insufficent data.");
                }
+               limit = bufferLimit;
             }
 
             switch (byteBuffer[bufferIndex]) {
             case QUOTE:
-               return (isAsciiValues ? parseAsciiString(++bufferIndex) : parseString(++bufferIndex));
+               return (isAsciiValues ? parseAsciiString(++bufferIndex, context) : parseString(++bufferIndex, context));
             case 't':
-               valueDeque.add(true);
+               context.booleanHolder = true;
                return ++bufferIndex;
             case 'f':
-               valueDeque.add(false);
+               context.booleanHolder = false;
                return ++bufferIndex;
             case 'n':
-               valueDeque.add(null);
+               context.objectHolder = null;
                return ++bufferIndex;
             case '0':
             case '1':
@@ -212,37 +208,37 @@ public final class BaseJsonParser implements ObjectMapper
             case CLOSE_BRACKET:
                return ++bufferIndex;
             default:
-               Context nextContext = null;
+               Context nextContext = context;
                final Phield phield = context.phield;
                if (phield != null) {
                   if (phield.isCollection || phield.isArray) {
                      nextContext = new Context(phield.getCollectionParameterClazz1());
                      nextContext.createInstance();
-                     valueDeque.add(nextContext.target);
+                     // valueDeque.add(nextContext.target);
                   }                  
                }
 
                bufferIndex = parseValue(bufferIndex, context, nextContext);
                @SuppressWarnings("unchecked")
                Collection<Object> collection = ((Collection<Object>) context.target);
-               collection.add(valueDeque.removeLast() /* member value */);
+               collection.add(nextContext.target);
+               // collection.add(valueDeque.removeLast() /* member value */);
             }
          }
       }
       catch (Exception e) {
          throw new RuntimeException(e);
       }
-
    }
 
-   private int parseString(int bufferIndex)
+   private int parseString(int bufferIndex, final Context context)
    {
       try {
          final int startIndex = bufferIndex;
          while (true) {
             final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
             if (newIndex > 0) {
-               valueDeque.add(new String(byteBuffer, startIndex, (newIndex - startIndex), "UTF-8"));
+               context.stringHolder = new String(byteBuffer, startIndex, (newIndex - startIndex), "UTF-8");
                return newIndex + 1;
             }
 
@@ -263,14 +259,14 @@ public final class BaseJsonParser implements ObjectMapper
       }
    }
 
-   private int parseAsciiString(int bufferIndex)
+   private int parseAsciiString(int bufferIndex, final Context context)
    {
       try {
          final int startIndex = bufferIndex;
          while (true) {
             final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
             if (newIndex > 0) {
-               valueDeque.add(Utf8Utils.fastTrackAsciiDecode(byteBuffer, startIndex, (newIndex - startIndex)));
+               context.stringHolder = Utf8Utils.fastTrackAsciiDecode(byteBuffer, startIndex, (newIndex - startIndex));
                return newIndex + 1;
             }
 
@@ -291,23 +287,19 @@ public final class BaseJsonParser implements ObjectMapper
       }
    }
 
-   private void setMember(final Context context, final String memberName, final Object value)
+   private void setMember(final Phield phield, final Context context)
    {
       try {
-         final Phield phield = context.clazz.getPhield(memberName);
-         // phield.field.set(context.target, (value == Void.TYPE ? null : value));
-         UNSAFE.putObject(context.target, phield.fieldOffset, (value == Void.TYPE ? null : value));
-      }
-      catch (SecurityException | IllegalArgumentException e) {
-         throw new RuntimeException(e);
-      }
-   }
-
-   private void setMember(final Object target, final Phield phield, final Object value)
-   {
-      try {
-         // phield.field.set(target, (value == Void.TYPE ? null : value));
-         UNSAFE.putObject(target, phield.fieldOffset, (value == Void.TYPE ? null : value));
+         switch (phield.type) {
+            case Types.INT:
+               break;
+            case Types.STRING:
+               UNSAFE.putObject(context.target, phield.fieldOffset, context.stringHolder);
+               break;
+            case Types.OBJECT:
+               UNSAFE.putObject(context.target, phield.fieldOffset, (context.objectHolder == Void.TYPE ? null : context.objectHolder));
+               break;
+         }
       }
       catch (SecurityException | IllegalArgumentException e) {
          throw new RuntimeException(e);

@@ -19,6 +19,7 @@ public final class Phield
    public final boolean isArray;
    public final boolean isPrimitive;
    public final long fieldOffset;
+   public final int type;
 
    @SuppressWarnings("restriction")
    public Phield(final Field field) {
@@ -30,6 +31,7 @@ public final class Phield
       this.isMap = Map.class.isAssignableFrom(fieldClass);
       this.isArray = fieldClass.isArray();
       this.isPrimitive = fieldClass.isPrimitive() || fieldClass == String.class;
+      this.type = getType(field);
 
       if (isCollection || isMap) {
          clazz = null;
@@ -84,6 +86,35 @@ public final class Phield
    public Clazz getCollectionParameterClazz2()
    {
       return collectionParameterClazz2;
+   }
+
+   private int getType(Field field)
+   {
+      Class<?> type = field.getType();
+      if (type == byte.class) {
+         return Types.BYTE;
+      }
+      else if (type == char.class) {
+         return Types.CHAR;
+      }
+      else if (type == short.class) {
+         return Types.SHORT;
+      }
+      else if (type == int.class) {
+         return Types.INT;
+      }
+      else if (type == long.class) {
+         return Types.LONG;
+      }
+      else if (type == String.class) {
+         return Types.STRING;
+      }
+      else if (type == boolean.class) {
+         return Types.BOOLEAN;
+      }
+      else {
+         return Types.OBJECT;
+      }
    }
 
    @Override
