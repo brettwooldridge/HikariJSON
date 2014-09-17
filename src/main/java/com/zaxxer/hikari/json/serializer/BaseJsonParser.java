@@ -65,29 +65,27 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseObject(int bufferIndex, final Context context)
    {
-      while (true) {
-         if (bufferIndex == bufferLimit) {
-            if ((bufferIndex = fillBuffer()) == -1) {
-               throw new RuntimeException("Insufficent data.");
-            }
+      do {
+         if (bufferIndex == bufferLimit && (bufferIndex = fillBuffer()) == -1) {
+            throw new RuntimeException("Insufficent data.");
          }
 
          switch (byteBuffer[bufferIndex]) {
          case OPEN_CURLY:
-            bufferIndex = parseMembers(++bufferIndex, context);
+            bufferIndex = parseMembers(bufferIndex + 1, context);
             continue;
          case CLOSE_CURLY:
-            return ++bufferIndex;
+            return bufferIndex + 1;
          default:
             bufferIndex++;
          }
-      }
+      } while (true);
    }
 
    private int parseMembers(int bufferIndex, final Context context)
    {
       int limit = bufferLimit;
-      while (true) {
+      do {
          for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
             ; // skip whitespace
 
@@ -107,16 +105,16 @@ public final class BaseJsonParser implements ObjectMapper
          default:
             bufferIndex++;
          }
-      }
+      } while (true);
    }
 
    private int parseMember(int bufferIndex, final Context context)
    {
       // Parse the member name
-      bufferIndex = (isAsciiMembers ? parseAsciiString(++bufferIndex, context) : parseString(++bufferIndex, context));
+      bufferIndex = (isAsciiMembers ? parseAsciiString(bufferIndex + 1, context) : parseString(bufferIndex + 1, context));
 
       // Next character better be a colon
-      while (true) {
+      do {
          if (bufferIndex == bufferLimit && (bufferIndex = fillBuffer()) == -1) {
             throw new RuntimeException("Insufficent data.  Expecting colon after member.");
          }
@@ -124,20 +122,21 @@ public final class BaseJsonParser implements ObjectMapper
          if (byteBuffer[bufferIndex++] == COLON) {
             break;
          }
-      }
+      } while (true);
 
       // Now the value
-      final String memberName = context.stringHolder;
-      Context nextContext = null;
-      final Phield phield = context.clazz.getPhield(memberName);
+      final Phield phield = context.clazz.getPhield(context.stringHolder);
       context.holderType = phield.type;
       if (phield.type == Types.OBJECT) {
-         nextContext = new Context(phield);
+         final Context nextContext = new Context(phield);
          nextContext.createInstance();
          context.objectHolder = nextContext.target;
+         bufferIndex = parseValue(bufferIndex, context, nextContext);
+      }
+      else {
+         bufferIndex = parseValue(bufferIndex, context, null);
       }
 
-      bufferIndex = parseValue(bufferIndex, context, nextContext);
       setMember(phield, context);
 
       return bufferIndex;
@@ -145,8 +144,9 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseValue(int bufferIndex, final Context context, final Context nextContext)
    {
-      int limit = bufferLimit;
-      while (true) {
+      
+      do {
+         final int limit = bufferLimit;
          for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
 
             final int b = buffer[bufferIndex];
@@ -156,16 +156,16 @@ public final class BaseJsonParser implements ObjectMapper
 
             switch (b) {
             case QUOTE:
-               return (isAsciiValues ? parseAsciiString(++bufferIndex, context) : parseString(++bufferIndex, context));
+               return (isAsciiValues ? parseAsciiString(bufferIndex + 1, context) : parseString(bufferIndex + 1, context));
             case 't':
                context.booleanHolder = true;
-               return ++bufferIndex;
+               return bufferIndex + 1;
             case 'f':
                context.booleanHolder = false;
-               return ++bufferIndex;
+               return bufferIndex + 1;
             case 'n':
                context.objectHolder = null;
-               return ++bufferIndex;
+               return bufferIndex + 1;
             case '-':
             case '1':
             case '2':
@@ -180,25 +180,22 @@ public final class BaseJsonParser implements ObjectMapper
             case OPEN_CURLY:
                return parseObject(bufferIndex, nextContext);
             case OPEN_BRACKET:
-               return parseArray(++bufferIndex, nextContext);
+               return parseArray(bufferIndex + 1, nextContext);
             default:
                break;
             }
          }
 
-         if (bufferIndex == limit) {
-            if ((bufferIndex = fillBuffer()) == -1) {
-               throw new RuntimeException("Insufficent data.");
-            }
-            limit = bufferLimit;
+         if (bufferIndex == limit && ((bufferIndex = fillBuffer()) == -1)) {
+            throw new RuntimeException("Insufficent data.");
          }
-      }
+      } while (true);
    }
 
    private int parseArray(int bufferIndex, final Context context)
    {
       int limit = bufferLimit;
-      while (true) {
+      do {
          for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
             ; // skip whitespace
 
@@ -211,7 +208,7 @@ public final class BaseJsonParser implements ObjectMapper
 
          switch (byteBuffer[bufferIndex]) {
          case CLOSE_BRACKET:
-            return ++bufferIndex;
+            return bufferIndex + 1;
          default:
             Context nextContext = context;
             final Phield phield = context.phield;
@@ -227,14 +224,14 @@ public final class BaseJsonParser implements ObjectMapper
             Collection<Object> collection = ((Collection<Object>) context.target);
             collection.add(nextContext.target);
          }
-      }
+      } while (true);
    }
 
    private int parseString(int bufferIndex, final Context context)
    {
       try {
          final int startIndex = bufferIndex;
-         while (true) {
+         do {
             final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
             if (newIndex > 0) {
                context.stringHolder = new String(byteBuffer, startIndex, (newIndex - startIndex), "UTF-8");
@@ -251,7 +248,7 @@ public final class BaseJsonParser implements ObjectMapper
             }
 
             bufferIndex = seekBackUtf8Boundary(byteBuffer, bufferIndex);
-         }
+         } while (true);
       }
       catch (Exception e) {
          throw new RuntimeException();
@@ -262,7 +259,7 @@ public final class BaseJsonParser implements ObjectMapper
    {
       try {
          final int startIndex = bufferIndex;
-         while (true) {
+         do {
             final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
             if (newIndex > 0) {
                context.stringHolder = Utf8Utils.fastTrackAsciiDecode(byteBuffer, startIndex, (newIndex - startIndex));
@@ -279,7 +276,7 @@ public final class BaseJsonParser implements ObjectMapper
             }
 
             bufferIndex = seekBackUtf8Boundary(byteBuffer, bufferIndex);
-         }
+         } while (true);
       }
       catch (Exception e) {
          throw new RuntimeException();
@@ -288,60 +285,42 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseInteger(int bufferIndex, Context context)
    {
-      boolean negative = (byteBuffer[bufferIndex] == '-');
-      if (negative) {
+      boolean neg = (byteBuffer[bufferIndex] == '-');
+      if (neg) {
          ++bufferIndex;
       }
 
-      boolean expsign = false;
-      boolean expnegative = false;
-      long value = 0;
-      int exp = 0;
+      // integer part
       int limit = bufferLimit;
-
-      while (true) {
-         for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
-            final int b = buffer[bufferIndex];
-            switch (b) {
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-            case '0':
-               if (expsign) {
-                  exp = (exp * 10) + (b - '0');
+      long part = 0;
+      outer1: while (true) {
+         try {
+            for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
+               final int b = buffer[bufferIndex];
+               if (b >= '0' && b <= '9') {
+                  part = part * 10 + (b - '0');
                }
                else {
-                  value = (value * 10) + (b - '0');
+                  break outer1;
                }
-               break;
-            case '.':
-               throw new RuntimeException("Expecting integer type, but encountered decimal point.");
-            case 'e':
-            case 'E':
-               expsign = true;
-               break;
-            case '-':
-               expnegative = true;
-               break;
-            default:
-
-               return bufferIndex;
             }
          }
-
-         if (bufferIndex == limit) {
-            if ((bufferIndex = fillBuffer()) == -1) {
-               throw new RuntimeException("Insufficent data during number parsing.");
+         finally {
+            if (bufferIndex == limit) {
+               if ((bufferIndex = fillBuffer()) == -1) {
+                  throw new RuntimeException("Insufficent data during number parsing.");
+               }
+               limit = bufferLimit;
             }
-            limit = bufferLimit;
          }
       }
+
+      if (neg) {
+         part *= -1;
+      }
+
+      context.longHolder = part;
+      return bufferIndex;
    }
 
    private int parseDecimal(int bufferIndex, Context context)
@@ -362,12 +341,12 @@ public final class BaseJsonParser implements ObjectMapper
          try {
             for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
                final int b = buffer[bufferIndex];
-               if(b == '.') {
-                  shift = 1;
-               }
-               else if (b >= '0' && b <= '9') {
+               if (b >= '0' && b <= '9') {
                   shift *= 10;
                   part = part * 10 + (b - '0');
+               }
+               else if (b == '.') {
+                  shift = 1;
                }
                else {
                   break outer1;
@@ -420,7 +399,7 @@ public final class BaseJsonParser implements ObjectMapper
       try {
          switch (phield.type) {
          case Types.INT:
-            UNSAFE.putInt(context.target, phield.fieldOffset, context.intHolder);
+            UNSAFE.putInt(context.target, phield.fieldOffset, (int) context.longHolder);
             break;
          case Types.FLOAT:
             UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);

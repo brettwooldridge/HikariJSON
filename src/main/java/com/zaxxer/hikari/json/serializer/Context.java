@@ -15,7 +15,6 @@ public final class Context
    public String stringHolder;
    public Object objectHolder;
    public boolean booleanHolder;
-   public int intHolder;
    public long longHolder;
    public double doubleHolder;
    
