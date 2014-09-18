@@ -1,5 +1,7 @@
 package com.zaxxer.hikari.json.serializer;
 
+import static com.zaxxer.hikari.json.util.Utf8Utils.fastTrackAsciiDecode;
+import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuote;
 import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuoteUTF8;
 import static com.zaxxer.hikari.json.util.Utf8Utils.seekBackUtf8Boundary;
 
@@ -16,7 +18,6 @@ import com.zaxxer.hikari.json.ObjectMapper;
 import com.zaxxer.hikari.json.util.Phield;
 import com.zaxxer.hikari.json.util.Types;
 import com.zaxxer.hikari.json.util.UnsafeHelper;
-import com.zaxxer.hikari.json.util.Utf8Utils;
 
 @SuppressWarnings("restriction")
 public final class BaseJsonParser implements ObjectMapper
@@ -230,9 +231,15 @@ public final class BaseJsonParser implements ObjectMapper
       try {
          final int startIndex = bufferIndex;
          do {
-            final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
+            context.mutableBoolean.bool = false;
+            final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex, context.mutableBoolean);
             if (newIndex > 0) {
-               context.stringHolder = new String(byteBuffer, startIndex, (newIndex - startIndex), "UTF-8");
+               if (context.mutableBoolean.bool) {
+                  context.stringHolder = new String(byteBuffer, startIndex, (newIndex - startIndex), "UTF-8");
+               }
+               else {
+                  context.stringHolder = fastTrackAsciiDecode(byteBuffer, startIndex, (newIndex - startIndex));
+               }
                return newIndex + 1;
             }
 
@@ -258,9 +265,9 @@ public final class BaseJsonParser implements ObjectMapper
       try {
          final int startIndex = bufferIndex;
          do {
-            final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex);
+            final int newIndex = findEndQuote(byteBuffer, bufferIndex);
             if (newIndex > 0) {
-               context.stringHolder = Utf8Utils.fastTrackAsciiDecode(byteBuffer, startIndex, (newIndex - startIndex));
+               context.stringHolder = fastTrackAsciiDecode(byteBuffer, startIndex, (newIndex - startIndex));
                return newIndex + 1;
             }
 

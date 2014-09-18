@@ -2,12 +2,15 @@ package com.zaxxer.hikari.json.serializer;
 
 import com.zaxxer.hikari.json.util.ClassUtils;
 import com.zaxxer.hikari.json.util.Clazz;
+import com.zaxxer.hikari.json.util.MutableBoolean;
 import com.zaxxer.hikari.json.util.Phield;
 
 public final class Context
 {
    public final Clazz clazz;
    public final Phield phield;
+
+   public final MutableBoolean mutableBoolean = new MutableBoolean();
 
    public Object target;
 
@@ -17,7 +20,7 @@ public final class Context
    public boolean booleanHolder;
    public long longHolder;
    public double doubleHolder;
-   
+
    public Context(final Class<?> targetType)
    {
       this.clazz = ClassUtils.reflect(targetType);

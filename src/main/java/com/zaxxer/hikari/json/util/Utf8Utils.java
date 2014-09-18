@@ -26,11 +26,26 @@ public final class Utf8Utils
       // utility class
    }
 
-   public static int findEndQuoteUTF8(final byte[] array, int index)
+   public static int findEndQuote(final byte[] array, int index)
    {
       for (; index < array.length; index++) {
          if (array[index] == 0x22 /* quote */ && array[index - 1] != 0x5c /* backslash */) {
             return index;
+         }
+      }
+
+      return -1; // we ran out of data
+   }
+
+   public static int findEndQuoteUTF8(final byte[] array, int index, final MutableBoolean utf8Detected)
+   {
+      for (; index < array.length; index++) {
+         final int c = array[index];
+         if (c == 0x22 /* quote */ && array[index - 1] != 0x5c /* backslash */) {
+            return index;
+         }
+         else if (c < 0 && !utf8Detected.bool) {
+            utf8Detected.bool = true;
          }
       }
 
