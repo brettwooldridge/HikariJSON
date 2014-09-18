@@ -86,8 +86,8 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseMembers(int bufferIndex, final Context context)
    {
+      int limit = bufferLimit;
       do {
-         final int limit = bufferLimit;
          for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
             ; // skip whitespace
 
@@ -95,6 +95,7 @@ public final class BaseJsonParser implements ObjectMapper
             if ((bufferIndex = fillBuffer()) == -1) {
                throw new RuntimeException("Insufficent data.");
             }
+            limit = bufferLimit;
          }
 
          switch (byteBuffer[bufferIndex]) {
@@ -145,9 +146,8 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseValue(int bufferIndex, final Context context, final Context nextContext)
    {
-      
+      int limit = bufferLimit;
       do {
-         final int limit = bufferLimit;
          for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
 
             final int b = buffer[bufferIndex];
@@ -185,6 +185,7 @@ public final class BaseJsonParser implements ObjectMapper
             default:
                break;
             }
+            limit = bufferLimit;
          }
 
          if (bufferIndex == limit && ((bufferIndex = fillBuffer()) == -1)) {
@@ -195,8 +196,8 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseArray(int bufferIndex, final Context context)
    {
+      int limit = bufferLimit;
       do {
-         final int limit = bufferLimit;
          for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
             ; // skip whitespace
 
@@ -204,6 +205,7 @@ public final class BaseJsonParser implements ObjectMapper
             if ((bufferIndex = fillBuffer()) == -1) {
                throw new RuntimeException("Insufficent data.");
             }
+            limit = bufferLimit;
          }
 
          switch (byteBuffer[bufferIndex]) {
@@ -296,10 +298,11 @@ public final class BaseJsonParser implements ObjectMapper
          ++bufferIndex;
       }
 
+      int limit = bufferLimit;
+
       // integer part
       long part = 0;
       outer1: while (true) {
-         final int limit = bufferLimit;
          try {
             for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
                final int b = buffer[bufferIndex];
@@ -310,6 +313,7 @@ public final class BaseJsonParser implements ObjectMapper
                   break outer1;
                }
             }
+            limit = bufferLimit;
          }
          finally {
             if (bufferIndex == limit && ((bufferIndex = fillBuffer()) == -1)) {
