@@ -4,18 +4,18 @@ import java.lang.reflect.Field;
 
 import sun.misc.Unsafe;
 
-@SuppressWarnings({ "restriction", "deprecation" })
+@SuppressWarnings({ "restriction" })
 public final class Utf8Utils
 {
    private static final Unsafe unsafe;
-   private static final int fieldOffset;
+   private static final long fieldOffset;
 
    static
    {
       unsafe = UnsafeHelper.getUnsafe();
       try {
          Field valueField = String.class.getDeclaredField("value");
-         fieldOffset = unsafe.fieldOffset(valueField);
+         fieldOffset = unsafe.objectFieldOffset(valueField);
       }
       catch (NoSuchFieldException | SecurityException e) {
          throw new RuntimeException("sun.misc.Unsafe not available");
@@ -55,8 +55,8 @@ public final class Utf8Utils
    public static String fastTrackAsciiDecode(final byte[] buf, final int offset, final int length)
    {
       final char[] chars = new char[length];
-      for (int i = 0, j = offset; i < length; i++, j++) {
-         chars[i] = (char) buf[j];
+      for (int i = 0; i < length; i++) {
+         chars[i] = (char) buf[offset + i];
       }
 
       final String s = new String();

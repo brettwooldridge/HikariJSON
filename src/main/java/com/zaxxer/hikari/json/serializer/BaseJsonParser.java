@@ -84,8 +84,8 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseMembers(int bufferIndex, final Context context)
    {
-      int limit = bufferLimit;
       do {
+         final int limit = bufferLimit;
          for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
             ; // skip whitespace
 
@@ -93,7 +93,6 @@ public final class BaseJsonParser implements ObjectMapper
             if ((bufferIndex = fillBuffer()) == -1) {
                throw new RuntimeException("Insufficent data.");
             }
-            limit = bufferLimit;
          }
 
          switch (byteBuffer[bufferIndex]) {
@@ -194,8 +193,8 @@ public final class BaseJsonParser implements ObjectMapper
 
    private int parseArray(int bufferIndex, final Context context)
    {
-      int limit = bufferLimit;
       do {
+         final int limit = bufferLimit;
          for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
             ; // skip whitespace
 
@@ -203,7 +202,6 @@ public final class BaseJsonParser implements ObjectMapper
             if ((bufferIndex = fillBuffer()) == -1) {
                throw new RuntimeException("Insufficent data.");
             }
-            limit = bufferLimit;
          }
 
          switch (byteBuffer[bufferIndex]) {
