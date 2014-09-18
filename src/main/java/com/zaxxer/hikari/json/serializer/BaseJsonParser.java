@@ -15,6 +15,7 @@ import sun.misc.Unsafe;
 
 import com.zaxxer.hikari.json.JsonFactory.Option;
 import com.zaxxer.hikari.json.ObjectMapper;
+import com.zaxxer.hikari.json.util.MutableBoolean;
 import com.zaxxer.hikari.json.util.Phield;
 import com.zaxxer.hikari.json.util.Types;
 import com.zaxxer.hikari.json.util.UnsafeHelper;
@@ -231,10 +232,10 @@ public final class BaseJsonParser implements ObjectMapper
       try {
          final int startIndex = bufferIndex;
          do {
-            context.mutableBoolean.bool = false;
-            final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex, context.mutableBoolean);
+            final MutableBoolean utf8Detected = new MutableBoolean();
+            final int newIndex = findEndQuoteUTF8(byteBuffer, bufferIndex, utf8Detected);
             if (newIndex > 0) {
-               if (context.mutableBoolean.bool) {
+               if (utf8Detected.bool) {
                   context.stringHolder = new String(byteBuffer, startIndex, (newIndex - startIndex), "UTF-8");
                }
                else {

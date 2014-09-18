@@ -2,15 +2,12 @@ package com.zaxxer.hikari.json.serializer;
 
 import com.zaxxer.hikari.json.util.ClassUtils;
 import com.zaxxer.hikari.json.util.Clazz;
-import com.zaxxer.hikari.json.util.MutableBoolean;
 import com.zaxxer.hikari.json.util.Phield;
 
 public final class Context
 {
    public final Clazz clazz;
    public final Phield phield;
-
-   public final MutableBoolean mutableBoolean = new MutableBoolean();
 
    public Object target;
 
