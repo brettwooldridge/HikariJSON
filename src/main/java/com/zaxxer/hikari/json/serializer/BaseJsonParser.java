@@ -297,9 +297,9 @@ public final class BaseJsonParser implements ObjectMapper
       }
 
       // integer part
-      int limit = bufferLimit;
       long part = 0;
       outer1: while (true) {
+         final int limit = bufferLimit;
          try {
             for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
                final int b = buffer[bufferIndex];
@@ -312,11 +312,8 @@ public final class BaseJsonParser implements ObjectMapper
             }
          }
          finally {
-            if (bufferIndex == limit) {
-               if ((bufferIndex = fillBuffer()) == -1) {
-                  throw new RuntimeException("Insufficent data during number parsing.");
-               }
-               limit = bufferLimit;
+            if (bufferIndex == limit && ((bufferIndex = fillBuffer()) == -1)) {
+               throw new RuntimeException("Insufficent data during number parsing.");
             }
          }
       }
@@ -339,11 +336,10 @@ public final class BaseJsonParser implements ObjectMapper
          ++bufferIndex;
       }
 
-      int limit = bufferLimit;
-
       // integer part
       long shift = 0;
       outer1: while (true) {
+         final int limit = bufferLimit;
          try {
             for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
                final int b = buffer[bufferIndex];
@@ -360,11 +356,8 @@ public final class BaseJsonParser implements ObjectMapper
             }
          }
          finally {
-            if (bufferIndex == limit) {
-               if ((bufferIndex = fillBuffer()) == -1) {
-                  throw new RuntimeException("Insufficent data during number parsing.");
-               }
-               limit = bufferLimit;
+            if (bufferIndex == limit && ((bufferIndex = fillBuffer()) == -1)) {
+               throw new RuntimeException("Insufficent data during number parsing.");
             }
          }
       }
@@ -382,6 +375,7 @@ public final class BaseJsonParser implements ObjectMapper
          neg = byteBuffer[bufferIndex] == '-';
          bufferIndex = neg ? ++bufferIndex : bufferIndex;
          outer1: while (true) {
+            final int limit = bufferLimit;
             for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
                final int b = buffer[bufferIndex];
                if (b >= '0' && b <= '9') {
@@ -390,6 +384,10 @@ public final class BaseJsonParser implements ObjectMapper
                }
 
                break outer1;
+            }
+
+            if (bufferIndex == limit && ((bufferIndex = fillBuffer()) == -1)) {
+               throw new RuntimeException("Insufficent data during number parsing.");
             }
          }
 
