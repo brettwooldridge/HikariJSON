@@ -21,7 +21,7 @@ import com.zaxxer.hikari.json.util.Types;
 import com.zaxxer.hikari.json.util.UnsafeHelper;
 
 @SuppressWarnings("restriction")
-public final class BaseJsonParser implements ObjectMapper
+public final class FieldBasedJsonMapper implements ObjectMapper
 {
    protected static final char CR = '\r';
    protected static final char TAB = '\t';
@@ -44,7 +44,7 @@ public final class BaseJsonParser implements ObjectMapper
    protected byte[] byteBuffer;
    protected int bufferLimit;
 
-   public BaseJsonParser(Option... options) {
+   public FieldBasedJsonMapper(Option... options) {
       byteBuffer = new byte[BUFFER_SIZE];
 
       HashSet<Option> set = new HashSet<>(Arrays.asList(options));
@@ -58,14 +58,14 @@ public final class BaseJsonParser implements ObjectMapper
    {
       source = src;
 
-      Context context = new Context(valueType);
+      ParseContext context = new ParseContext(valueType);
       context.createInstance();
 
       parseObject(0, context);
       return (T) context.target;
    }
 
-   private int parseObject(int bufferIndex, final Context context)
+   private int parseObject(int bufferIndex, final ParseContext context)
    {
       do {
          if (bufferIndex == bufferLimit && (bufferIndex = fillBuffer()) == -1) {
@@ -84,7 +84,7 @@ public final class BaseJsonParser implements ObjectMapper
       } while (true);
    }
 
-   private int parseMembers(int bufferIndex, final Context context)
+   private int parseMembers(int bufferIndex, final ParseContext context)
    {
       int limit = bufferLimit;
       do {
@@ -110,7 +110,7 @@ public final class BaseJsonParser implements ObjectMapper
       } while (true);
    }
 
-   private int parseMember(int bufferIndex, final Context context)
+   private int parseMember(int bufferIndex, final ParseContext context)
    {
       // Parse the member name
       bufferIndex = (isAsciiMembers ? parseAsciiString(bufferIndex + 1, context) : parseString(bufferIndex + 1, context));
@@ -130,7 +130,7 @@ public final class BaseJsonParser implements ObjectMapper
       final Phield phield = context.clazz.getPhield(context.stringHolder);
       context.holderType = phield.type;
       if (phield.type == Types.OBJECT) {
-         final Context nextContext = new Context(phield);
+         final ParseContext nextContext = new ParseContext(phield);
          nextContext.createInstance();
          context.objectHolder = nextContext.target;
          bufferIndex = parseValue(bufferIndex, context, nextContext);
@@ -144,29 +144,29 @@ public final class BaseJsonParser implements ObjectMapper
       return bufferIndex;
    }
 
-   private int parseValue(int bufferIndex, final Context context, final Context nextContext)
+   private int parseValue(int bufferIndex, final ParseContext context, final ParseContext nextContext)
    {
-      int limit = bufferLimit;
       do {
-         for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++) {
+         int limit = bufferLimit;
+         while (bufferIndex < limit) {
 
-            final int b = buffer[bufferIndex];
+            final int b = byteBuffer[bufferIndex++];
             if (b <= SPACE) {
                continue;
             }
 
             switch (b) {
             case QUOTE:
-               return (isAsciiValues ? parseAsciiString(bufferIndex + 1, context) : parseString(bufferIndex + 1, context));
+               return (isAsciiValues ? parseAsciiString(bufferIndex, context) : parseString(bufferIndex, context));
             case 't':
                context.booleanHolder = true;
-               return bufferIndex + 1;
+               return bufferIndex;
             case 'f':
                context.booleanHolder = false;
-               return bufferIndex + 1;
+               return bufferIndex;
             case 'n':
                context.objectHolder = null;
-               return bufferIndex + 1;
+               return bufferIndex;
             case '-':
             case '1':
             case '2':
@@ -177,15 +177,15 @@ public final class BaseJsonParser implements ObjectMapper
             case '7':
             case '8':
             case '9':
-               return ((context.holderType & Types.INTEGRAL_TYPE) > 0) ? parseInteger(bufferIndex, context) : parseDecimal(bufferIndex, context);
+               return ((context.holderType & Types.INTEGRAL_TYPE) > 0) ? parseInteger(bufferIndex - 1, context) : parseDecimal(bufferIndex - 1, context);
             case OPEN_CURLY:
-               return parseObject(bufferIndex, nextContext);
-            case OPEN_BRACKET:
-               return parseArray(bufferIndex + 1, nextContext);
-            default:
+               bufferIndex = parseMembers(bufferIndex, nextContext);
                break;
+            case CLOSE_CURLY:
+               return bufferIndex;
+            case OPEN_BRACKET:
+               return parseArray(bufferIndex, nextContext);
             }
-            limit = bufferLimit;
          }
 
          if (bufferIndex == limit && ((bufferIndex = fillBuffer()) == -1)) {
@@ -194,7 +194,7 @@ public final class BaseJsonParser implements ObjectMapper
       } while (true);
    }
 
-   private int parseArray(int bufferIndex, final Context context)
+   private int parseArray(int bufferIndex, final ParseContext context)
    {
       int limit = bufferLimit;
       do {
@@ -212,11 +212,11 @@ public final class BaseJsonParser implements ObjectMapper
          case CLOSE_BRACKET:
             return bufferIndex + 1;
          default:
-            Context nextContext = context;
+            ParseContext nextContext = context;
             final Phield phield = context.phield;
             if (phield != null) {
                if (phield.isCollection || phield.isArray) {
-                  nextContext = new Context(phield.getCollectionParameterClazz1());
+                  nextContext = new ParseContext(phield.getCollectionParameterClazz1());
                   nextContext.createInstance();
                }
             }
@@ -229,7 +229,7 @@ public final class BaseJsonParser implements ObjectMapper
       } while (true);
    }
 
-   private int parseString(int bufferIndex, final Context context)
+   private int parseString(int bufferIndex, final ParseContext context)
    {
       try {
          final int startIndex = bufferIndex;
@@ -263,7 +263,7 @@ public final class BaseJsonParser implements ObjectMapper
       }
    }
 
-   private int parseAsciiString(int bufferIndex, final Context context)
+   private int parseAsciiString(int bufferIndex, final ParseContext context)
    {
       try {
          final int startIndex = bufferIndex;
@@ -291,7 +291,7 @@ public final class BaseJsonParser implements ObjectMapper
       }
    }
 
-   private int parseInteger(int bufferIndex, Context context)
+   private int parseInteger(int bufferIndex, ParseContext context)
    {
       boolean neg = (byteBuffer[bufferIndex] == '-');
       if (neg) {
@@ -330,7 +330,7 @@ public final class BaseJsonParser implements ObjectMapper
       return bufferIndex;
    }
 
-   private int parseDecimal(int bufferIndex, Context context)
+   private int parseDecimal(int bufferIndex, ParseContext context)
    {
       double d = 0.0;      // value
       long part  = 0;      // the current part (int, float and sci parts of the number)
@@ -402,7 +402,7 @@ public final class BaseJsonParser implements ObjectMapper
       return bufferIndex;
    }
 
-   private void setMember(final Phield phield, final Context context)
+   private void setMember(final Phield phield, final ParseContext context)
    {
       try {
          switch (phield.type) {

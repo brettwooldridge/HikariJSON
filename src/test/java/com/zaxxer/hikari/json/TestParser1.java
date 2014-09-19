@@ -33,6 +33,7 @@ public class TestParser1
       File file = new File("src/test/resources/AllTypes.json");
       try (InputStream is = new FileInputStream(file)) {
          AllType allType = objectMapper.readValue(is, AllType.class);
+         Assert.assertTrue(allType.myDouble == 1.2);
       }
    }
 }

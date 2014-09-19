@@ -4,7 +4,7 @@ import com.zaxxer.hikari.json.util.ClassUtils;
 import com.zaxxer.hikari.json.util.Clazz;
 import com.zaxxer.hikari.json.util.Phield;
 
-public final class Context
+public final class ParseContext
 {
    public final Clazz clazz;
    public final Phield phield;
@@ -18,19 +18,19 @@ public final class Context
    public long longHolder;
    public double doubleHolder;
 
-   public Context(final Class<?> targetType)
+   public ParseContext(final Class<?> targetType)
    {
       this.clazz = ClassUtils.reflect(targetType);
       this.phield = null;
    }
 
-   public Context(final Clazz clazz)
+   public ParseContext(final Clazz clazz)
    {
       this.clazz = clazz;
       this.phield = null;
    }
 
-   public Context(final Phield phield) {
+   public ParseContext(final Phield phield) {
       this.phield = phield;
       this.clazz = phield.clazz;
    }

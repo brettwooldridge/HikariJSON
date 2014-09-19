@@ -3,7 +3,7 @@ package com.zaxxer.hikari.json;
 import java.util.Arrays;
 import java.util.HashSet;
 
-import com.zaxxer.hikari.json.serializer.BaseJsonParser;
+import com.zaxxer.hikari.json.serializer.FieldBasedJsonMapper;
 
 
 public class JsonFactory
@@ -64,7 +64,7 @@ public class JsonFactory
       {
          if (options.contains(Option.FIELD_ACCESS))
          {
-               return new BaseJsonParser(options.toArray(new Option[0]));               
+               return new FieldBasedJsonMapper(options.toArray(new Option[0]));               
          }
 
          throw new UnsupportedOperationException();
