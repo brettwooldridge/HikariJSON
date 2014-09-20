@@ -59,7 +59,6 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       source = src;
 
       ParseContext context = new ParseContext(valueType);
-      context.createInstance();
 
       parseObject(0, context);
       return (T) context.target;
@@ -131,7 +130,6 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       context.holderType = phield.type;
       if (phield.type == Types.OBJECT) {
          final ParseContext nextContext = new ParseContext(phield);
-         nextContext.createInstance();
          context.objectHolder = nextContext.target;
          bufferIndex = parseValue(bufferIndex, context, nextContext);
       }
@@ -217,7 +215,6 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             if (phield != null) {
                if (phield.isCollection || phield.isArray) {
                   nextContext = new ParseContext(phield.getCollectionParameterClazz1());
-                  nextContext.createInstance();
                }
             }
 

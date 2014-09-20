@@ -9,7 +9,7 @@ public final class ParseContext
    public final Clazz clazz;
    public final Phield phield;
 
-   public Object target;
+   public final Object target;
 
    public int holderType;
    public String stringHolder;
@@ -18,25 +18,31 @@ public final class ParseContext
    public long longHolder;
    public double doubleHolder;
 
-   public ParseContext(final Class<?> targetType)
-   {
+   public ParseContext(final Class<?> targetType) {
       this.clazz = ClassUtils.reflect(targetType);
       this.phield = null;
+      try {
+         target = clazz.newInstance();
+      }
+      catch (InstantiationException | IllegalAccessException e) {
+         throw new RuntimeException(e);
+      }
    }
 
-   public ParseContext(final Clazz clazz)
-   {
+   public ParseContext(final Clazz clazz) {
       this.clazz = clazz;
       this.phield = null;
+      try {
+         target = clazz.newInstance();
+      }
+      catch (InstantiationException | IllegalAccessException e) {
+         throw new RuntimeException(e);
+      }
    }
 
    public ParseContext(final Phield phield) {
       this.phield = phield;
       this.clazz = phield.clazz;
-   }
-
-   public void createInstance()
-   {
       try {
          if (clazz != null) {
             target = clazz.newInstance();
