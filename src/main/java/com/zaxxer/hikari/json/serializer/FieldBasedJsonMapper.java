@@ -23,17 +23,17 @@ import com.zaxxer.hikari.json.util.UnsafeHelper;
 @SuppressWarnings("restriction")
 public final class FieldBasedJsonMapper implements ObjectMapper
 {
-   protected static final char CR = '\r';
-   protected static final char TAB = '\t';
-   protected static final char SPACE = ' ';
-   protected static final char QUOTE = '"';
-   protected static final char COLON = ':';
-   protected static final char COMMA = ',';
-   protected static final char NEWLINE = '\n';
-   protected static final char OPEN_CURLY = '{';
-   protected static final char CLOSE_CURLY = '}';
-   protected static final char OPEN_BRACKET = '[';
-   protected static final char CLOSE_BRACKET = ']';
+   protected static final int CR = '\r';
+   protected static final int TAB = '\t';
+   protected static final int SPACE = ' ';
+   protected static final int QUOTE = '"';
+   protected static final int COLON = ':';
+   protected static final int COMMA = ',';
+   protected static final int NEWLINE = '\n';
+   protected static final int OPEN_CURLY = '{';
+   protected static final int CLOSE_CURLY = '}';
+   protected static final int OPEN_BRACKET = '[';
+   protected static final int CLOSE_BRACKET = ']';
 
    private static final Unsafe UNSAFE = UnsafeHelper.getUnsafe();
    private final boolean isAsciiMembers;
