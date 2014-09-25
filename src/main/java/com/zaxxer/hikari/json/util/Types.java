@@ -17,7 +17,8 @@ public class Types
    public static final int BOOLEAN = 0b0100;
    public static final int STRING  = 0b0110;
    public static final int OBJECT  = 0b1000;
-   public static final int ENUM    = 0b1100;
+   public static final int ENUM    = 0b1010;
+   public static final int DATE    = 0b1100;
 
    public static final int INTEGRAL_TYPE = 0b1;
 }

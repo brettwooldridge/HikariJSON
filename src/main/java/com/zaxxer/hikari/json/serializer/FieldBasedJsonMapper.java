@@ -29,6 +29,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    protected static final int QUOTE = '"';
    protected static final int COLON = ':';
    protected static final int COMMA = ',';
+   protected static final int HYPHEN = '-';
    protected static final int NEWLINE = '\n';
    protected static final int OPEN_CURLY = '{';
    protected static final int CLOSE_CURLY = '}';
@@ -67,9 +68,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    private int parseObject(int bufferIndex, final ParseContext context)
    {
       do {
-         if (bufferIndex == bufferLimit && (bufferIndex = fillBuffer()) == -1) {
-            throw new RuntimeException("Insufficent data.");
-         }
+         bufferIndex = fillBuffer(bufferIndex);
 
          switch (byteBuffer[bufferIndex]) {
          case OPEN_CURLY:
@@ -91,9 +90,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             ; // skip whitespace
 
          if (bufferIndex == limit) {
-            if ((bufferIndex = fillBuffer()) == -1) {
-               throw new RuntimeException("Insufficent data.");
-            }
+            bufferIndex = fillBuffer(bufferIndex);
             limit = bufferLimit;
          }
 
@@ -116,9 +113,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
 
       // Next character better be a colon
       do {
-         if (bufferIndex == bufferLimit && (bufferIndex = fillBuffer()) == -1) {
-            throw new RuntimeException("Insufficent data.  Expecting colon after member.");
-         }
+         bufferIndex = fillBuffer(bufferIndex);
 
          if (byteBuffer[bufferIndex++] == COLON) {
             break;
@@ -165,7 +160,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             case 'n':
                context.objectHolder = null;
                return bufferIndex;
-            case '-':
+            case HYPHEN:
             case '1':
             case '2':
             case '3':
@@ -186,9 +181,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             }
          }
 
-         if (bufferIndex == limit && ((bufferIndex = fillBuffer()) == -1)) {
-            throw new RuntimeException("Insufficent data.");
-         }
+         bufferIndex = fillBuffer(bufferIndex);
       } while (true);
    }
 
@@ -200,9 +193,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             ; // skip whitespace
 
          if (bufferIndex == limit) {
-            if ((bufferIndex = fillBuffer()) == -1) {
-               throw new RuntimeException("Insufficent data.");
-            }
+            bufferIndex = fillBuffer(bufferIndex);
             limit = bufferLimit;
          }
 
@@ -313,9 +304,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             limit = bufferLimit;
          }
          finally {
-            if (bufferIndex == limit && ((bufferIndex = fillBuffer()) == -1)) {
-               throw new RuntimeException("Insufficent data during number parsing.");
-            }
+            bufferIndex = fillBuffer(bufferIndex);
          }
       }
 
@@ -357,9 +346,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             }
          }
          finally {
-            if (bufferIndex == limit && ((bufferIndex = fillBuffer()) == -1)) {
-               throw new RuntimeException("Insufficent data during number parsing.");
-            }
+            bufferIndex = fillBuffer(bufferIndex);
          }
       }
 
@@ -387,9 +374,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
                break outer1;
             }
 
-            if (bufferIndex == limit && ((bufferIndex = fillBuffer()) == -1)) {
-               throw new RuntimeException("Insufficent data during number parsing.");
-            }
+            bufferIndex = fillBuffer(bufferIndex);
          }
 
          d = (neg) ? d / (double)Math.pow(10, part) : d * (double)Math.pow(10, part);
@@ -425,19 +410,23 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       }
    }
 
-   final protected int fillBuffer()
+   final protected int fillBuffer(final int bufferIndex)
    {
-      try {
-         int read = source.read(byteBuffer);
-         if (read > 0) {
-            bufferLimit = read;
-            return 0;
+      if (bufferIndex == bufferLimit) {
+         try {
+            int read = source.read(byteBuffer);
+            if (read > 0) {
+               bufferLimit = read;
+               return 0;
+            }
+   
+            throw new RuntimeException("Insufficient data during parsing");
          }
+         catch (IOException io) {
+            throw new RuntimeException(io);
+         }
+      }
 
-         return -1;
-      }
-      catch (IOException io) {
-         throw new RuntimeException(io);
-      }
+      return bufferIndex;
    }
 }
