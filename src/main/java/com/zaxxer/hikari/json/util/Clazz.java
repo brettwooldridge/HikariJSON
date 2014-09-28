@@ -5,6 +5,8 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.zaxxer.hikari.json.JsonProperty;
+
 public final class Clazz
 {
    private final Class<?> actualClass;
@@ -20,8 +22,14 @@ public final class Clazz
    {
       for (Field field : actualClass.getDeclaredFields()) {
          if (!Modifier.isStatic(field.getModifiers())) {
-            fields.put(field.getName(), new Phield(field));
-            fields.put(field.getName().toLowerCase(), new Phield(field));
+            JsonProperty jsonProperty = field.getAnnotation(JsonProperty.class);
+            if (jsonProperty != null) {
+               fields.put(jsonProperty.value(), new Phield(field));
+            }
+            else {
+               fields.put(field.getName(), new Phield(field));
+               fields.put(field.getName().toLowerCase(), new Phield(field));
+            }
          }
       }
    }

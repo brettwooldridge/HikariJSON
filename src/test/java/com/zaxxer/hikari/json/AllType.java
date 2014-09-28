@@ -13,7 +13,8 @@ public class AllType
    public String string;
    public String string2;
    public byte myByte;
-   public Date date;
+   @JsonProperty(value = "date")
+   public Date _date;
 
    public AllType allType;
 

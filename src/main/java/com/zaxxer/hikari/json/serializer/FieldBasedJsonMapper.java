@@ -402,22 +402,46 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    private void setMember(final Phield phield, final ParseContext context)
    {
       try {
-         switch (phield.type) {
-         case Types.INT:
-            UNSAFE.putInt(context.target, phield.fieldOffset, (int) context.longHolder);
-            break;
-         case Types.FLOAT:
-            UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
-            break;
-         case Types.DOUBLE:
-            UNSAFE.putDouble(context.target, phield.fieldOffset, context.doubleHolder);
-            break;
-         case Types.STRING:
-            UNSAFE.putObject(context.target, phield.fieldOffset, context.stringHolder);
-            break;
-         case Types.OBJECT:
-            UNSAFE.putObject(context.target, phield.fieldOffset, (context.objectHolder == Void.TYPE ? null : context.objectHolder));
-            break;
+         if (phield.isIntegralType) {
+            switch (phield.type) {
+            case Types.INT:
+               UNSAFE.putInt(context.target, phield.fieldOffset, (int) context.longHolder);
+               break;
+            case Types.LONG:
+               UNSAFE.putLong(context.target, phield.fieldOffset, context.longHolder);
+               break;
+            case Types.SHORT:
+               UNSAFE.putShort(context.target, phield.fieldOffset, (short) context.longHolder);
+               break;
+            case Types.BYTE:
+               UNSAFE.putByte(context.target, phield.fieldOffset, (byte) context.longHolder);
+               break;
+            case Types.CHAR:
+               UNSAFE.putChar(context.target, phield.fieldOffset, (char) context.longHolder);
+               break;
+            }
+         }
+         else {
+            switch (phield.type) {
+            case Types.STRING:
+               UNSAFE.putObject(context.target, phield.fieldOffset, context.stringHolder);
+               break;
+            case Types.OBJECT:
+               UNSAFE.putObject(context.target, phield.fieldOffset, (context.objectHolder == Void.TYPE ? null : context.objectHolder));
+               break;
+            case Types.DOUBLE:
+               UNSAFE.putDouble(context.target, phield.fieldOffset, context.doubleHolder);
+               break;
+            case Types.BOOLEAN:
+               UNSAFE.putBoolean(context.target, phield.fieldOffset, context.booleanHolder);
+            case Types.DATE:
+               break;
+            case Types.ENUM:
+               break;
+            case Types.FLOAT:
+               UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
+               break;
+            }
          }
       }
       catch (SecurityException | IllegalArgumentException e) {

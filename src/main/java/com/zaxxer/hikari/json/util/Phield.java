@@ -18,6 +18,7 @@ public final class Phield
    public final boolean isMap;
    public final boolean isArray;
    public final boolean isPrimitive;
+   public final boolean isIntegralType;
    public final long fieldOffset;
    public final int type;
 
@@ -32,6 +33,7 @@ public final class Phield
       this.isArray = fieldClass.isArray();
       this.isPrimitive = fieldClass.isPrimitive() || fieldClass == String.class;
       this.type = getType(field);
+      this.isIntegralType = (type & Types.INTEGRAL_TYPE) > 0;
 
       if (isCollection || isMap) {
          clazz = null;
@@ -117,6 +119,12 @@ public final class Phield
       }
       else if (type == double.class) {
          return Types.DOUBLE;
+      }
+      else if (type == java.util.Date.class) {
+         return Types.DATE;
+      }
+      else if (type.isEnum()) {
+         return Types.ENUM;
       }
       else {
          return Types.OBJECT;
