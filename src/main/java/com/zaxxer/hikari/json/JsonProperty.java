@@ -12,8 +12,9 @@ import java.lang.annotation.Target;
  * @author brettw
  *
  */
-@Target({ElementType.ANNOTATION_TYPE, ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER})
+@Target({ElementType.ANNOTATION_TYPE, ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface JsonProperty {
-   String value();
+   String name() default "";
+   boolean exclude() default false;
 }

@@ -23,12 +23,15 @@ public final class Clazz
       for (Field field : actualClass.getDeclaredFields()) {
          if (!Modifier.isStatic(field.getModifiers())) {
             JsonProperty jsonProperty = field.getAnnotation(JsonProperty.class);
+            boolean excluded = (jsonProperty != null && jsonProperty.exclude());
+
+            Phield phield = new Phield(field, excluded);
             if (jsonProperty != null) {
-               fields.put(jsonProperty.value(), new Phield(field));
+               fields.put(jsonProperty.name(), phield);
             }
             else {
-               fields.put(field.getName(), new Phield(field));
-               fields.put(field.getName().toLowerCase(), new Phield(field));
+               fields.put(field.getName(), phield);
+               fields.put(field.getName().toLowerCase(), phield);
             }
          }
       }

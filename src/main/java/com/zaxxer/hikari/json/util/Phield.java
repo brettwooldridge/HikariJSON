@@ -21,9 +21,10 @@ public final class Phield
    public final boolean isIntegralType;
    public final long fieldOffset;
    public final int type;
+   public final boolean excluded;
 
    @SuppressWarnings("restriction")
-   public Phield(final Field field) {
+   public Phield(final Field field, final boolean excluded) {
       Class<?> fieldClass = field.getType();
       this.field = field;
       this.field.setAccessible(true);
@@ -34,6 +35,7 @@ public final class Phield
       this.isPrimitive = fieldClass.isPrimitive() || fieldClass == String.class;
       this.type = getType(field);
       this.isIntegralType = (type & Types.INTEGRAL_TYPE) > 0;
+      this.excluded = excluded;
 
       if (isCollection || isMap) {
          clazz = null;

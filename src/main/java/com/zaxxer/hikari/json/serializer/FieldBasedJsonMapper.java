@@ -132,7 +132,9 @@ public final class FieldBasedJsonMapper implements ObjectMapper
          bufferIndex = parseValue(bufferIndex, context, null);
       }
 
-      setMember(phield, context);
+      if (!phield.excluded) {
+         setMember(phield, context);
+      }
 
       return bufferIndex;
    }
