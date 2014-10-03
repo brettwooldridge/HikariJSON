@@ -1,7 +1,7 @@
 package com.zaxxer.hikari.json;
 
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 import com.zaxxer.hikari.json.serializer.FieldBasedJsonMapper;
 
@@ -16,7 +16,8 @@ public class JsonFactory
       VALUES_ASCII,
       VALUES_UTF8,
       FIELD_ACCESS,
-      BEAN_ACCESS
+      BEAN_ACCESS,
+      COLLECTION_CLASS;
    }
 
    public static FactoryOptions option(Option...options)
@@ -34,7 +35,9 @@ public class JsonFactory
     */
    public static ObjectMapper create()
    {
-      return new FactoryOptions(Option.FIELD_ACCESS, Option.MEMBERS_ASCII, Option.VALUES_UTF8).create();
+      return new FactoryOptions(Option.FIELD_ACCESS, Option.MEMBERS_ASCII, Option.VALUES_UTF8)
+         .option(Option.COLLECTION_CLASS, ArrayList.class)
+         .create();
    }
 
    /**
@@ -42,16 +45,19 @@ public class JsonFactory
     */
    public static class FactoryOptions
    {
-      private HashSet<Option> options = new HashSet<>();
+      private HashMap<Option, Object> options = new HashMap<>();
 
-      private FactoryOptions(Option...options)
+      private FactoryOptions(final Option...options)
       {
-         this.options.addAll(Arrays.asList(options));
+         for (Option option : options)
+         {
+            this.options.put(option, null);
+         }
       }
 
-      public FactoryOptions option(Option option)
+      public FactoryOptions option(final Option option, final Object value)
       {
-         this.options.add(option);
+         this.options.put(option, value);
          return this;
       }
 
@@ -62,9 +68,9 @@ public class JsonFactory
        */
       public ObjectMapper create()
       {
-         if (options.contains(Option.FIELD_ACCESS))
+         if (options.containsKey(Option.FIELD_ACCESS))
          {
-               return new FieldBasedJsonMapper(options.toArray(new Option[0]));               
+               return new FieldBasedJsonMapper(options);               
          }
 
          throw new UnsupportedOperationException();

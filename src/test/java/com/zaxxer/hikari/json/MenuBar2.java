@@ -1,9 +1,8 @@
 package com.zaxxer.hikari.json;
 
-import java.util.Collection;
-import java.util.HashSet;
+import java.util.List;
 
-public class MenuBar
+public class MenuBar2
 {
    public Menu menu;
 
@@ -16,8 +15,7 @@ public class MenuBar
 
    public static class Popup
    {
-      @JsonCollection(collectionClass = HashSet.class)
-      public Collection<MenuItem> menuitem;
+      public List<MenuItem> menuitem;
    }
 
    public static class MenuItem

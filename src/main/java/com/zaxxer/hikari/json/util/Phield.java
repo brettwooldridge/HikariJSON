@@ -8,6 +8,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.zaxxer.hikari.json.JsonCollection;
+
 public final class Phield
 {
    public final Field field;
@@ -22,6 +24,8 @@ public final class Phield
    public final long fieldOffset;
    public final int type;
    public final boolean excluded;
+   @SuppressWarnings("rawtypes")
+   public final Class<? extends Collection> collectionClass;
 
    @SuppressWarnings("restriction")
    public Phield(final Field field, final boolean excluded) {
@@ -39,6 +43,10 @@ public final class Phield
 
       if (isCollection || isMap) {
          clazz = null;
+
+         JsonCollection jsonCollection = field.getAnnotation(JsonCollection.class);
+         collectionClass = (jsonCollection != null ? jsonCollection.collectionClass() : null);
+
          Type genericType = field.getGenericType();
          if (genericType instanceof ParameterizedType) {
             Type[] actualTypeArguments = ((ParameterizedType) genericType).getActualTypeArguments();
@@ -49,6 +57,7 @@ public final class Phield
       }
       else if (isArray) {
          clazz = null;
+         collectionClass = null;
          Type genericType = field.getGenericType();
          if (genericType instanceof Class<?>) {
             collectionParameterClazz1 = ClassUtils.reflect((Class<?>) genericType);
@@ -58,8 +67,10 @@ public final class Phield
       }
       else if (!fieldClass.getName().startsWith("java.")) {
          clazz = ClassUtils.reflect(fieldClass);
+         collectionClass = null;
       }
       else {
+         collectionClass = null;
          clazz = null;
       }
 
@@ -67,13 +78,21 @@ public final class Phield
       collectionParameterClazz2 = null;
    }
 
-   public Object newInstance() throws InstantiationException, IllegalAccessException
+   public Object newInstance(final Object... override) throws InstantiationException, IllegalAccessException
    {
       if (clazz != null) {
          return clazz.newInstance();
       }
       else if (isCollection || isArray) {
-         return new ArrayList<Object>();
+         if (override.length > 0) {
+            return ((Class<?>) override[0]).newInstance();
+         }
+         else if (collectionClass != null) {
+            return collectionClass.newInstance();
+         }
+         else {
+            return new ArrayList<Object>();
+         }
       }
       else if (isMap) {
          return new HashMap<Object, Object>();

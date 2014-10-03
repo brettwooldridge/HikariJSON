@@ -55,4 +55,20 @@ public final class ParseContext
          throw new RuntimeException(e);
       }
    }
+
+   public ParseContext(final Phield phield, Object override) {
+      this.phield = phield;
+      this.clazz = phield.clazz;
+      try {
+         if (clazz != null) {
+            target = clazz.newInstance();
+         }
+         else {
+            target = phield.newInstance(override);
+         }
+      }
+      catch (InstantiationException | IllegalAccessException e) {
+         throw new RuntimeException(e);
+      }
+   }
 }

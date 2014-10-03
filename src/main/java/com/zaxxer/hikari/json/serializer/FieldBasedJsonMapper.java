@@ -7,9 +7,8 @@ import static com.zaxxer.hikari.json.util.Utf8Utils.seekBackUtf8Boundary;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.Map;
 
 import sun.misc.Unsafe;
 
@@ -44,13 +43,17 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    protected InputStream source;
    protected byte[] byteBuffer;
    protected int bufferLimit;
+   private Class<?> collectionClass;
 
-   public FieldBasedJsonMapper(Option... options) {
+   public FieldBasedJsonMapper(Map<Option, Object> options) {
       byteBuffer = new byte[BUFFER_SIZE];
 
-      HashSet<Option> set = new HashSet<>(Arrays.asList(options));
-      isAsciiMembers = set.contains(Option.MEMBERS_ASCII);
-      isAsciiValues = set.contains(Option.VALUES_ASCII);
+      isAsciiMembers = options.containsKey(Option.MEMBERS_ASCII);
+      isAsciiValues = options.containsKey(Option.VALUES_ASCII);
+      Object collClass = options.get(Option.COLLECTION_CLASS);
+      if (collClass instanceof Class && Collection.class.isAssignableFrom((Class<?>) collClass)) {
+         collectionClass = (Class<?>) collClass;
+      }
    }
 
    @Override
@@ -124,7 +127,13 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       final Phield phield = context.clazz.getPhield(context.stringHolder);
       context.holderType = phield.type;
       if (phield.type == Types.OBJECT) {
-         final ParseContext nextContext = new ParseContext(phield);
+         final ParseContext nextContext;
+         if ((phield.isCollection || phield.isArray) && (phield.collectionClass == null && collectionClass != null)) {
+            nextContext = new ParseContext(phield, collectionClass);
+         }
+         else {
+            nextContext = new ParseContext(phield);
+         }
          context.objectHolder = nextContext.target;
          bufferIndex = parseValue(bufferIndex, context, nextContext);
       }
@@ -162,17 +171,6 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             case 'n':
                context.objectHolder = null;
                return bufferIndex;
-            case HYPHEN:
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-               return ((context.holderType & Types.INTEGRAL_TYPE) > 0) ? parseInteger(bufferIndex - 1, context) : parseDecimal(bufferIndex - 1, context);
             case OPEN_CURLY:
                bufferIndex = parseMembers(bufferIndex, nextContext);
                break;
@@ -180,6 +178,11 @@ public final class FieldBasedJsonMapper implements ObjectMapper
                return bufferIndex;
             case OPEN_BRACKET:
                return parseArray(bufferIndex, nextContext);
+            default:
+               // Handle numbers
+               if ((b > '1' - 1 && b < '9' + 1) || b == HYPHEN) {
+                  return ((context.holderType & Types.INTEGRAL_TYPE) > 0) ? parseInteger(bufferIndex - 1, context) : parseDecimal(bufferIndex - 1, context);
+               }
             }
          }
 
@@ -421,12 +424,12 @@ public final class FieldBasedJsonMapper implements ObjectMapper
                break;
             case Types.BOOLEAN:
                UNSAFE.putBoolean(context.target, phield.fieldOffset, context.booleanHolder);
+            case Types.FLOAT:
+               UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
+               break;
             case Types.DATE:
                break;
             case Types.ENUM:
-               break;
-            case Types.FLOAT:
-               UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
                break;
             }
          }
