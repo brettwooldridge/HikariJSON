@@ -73,13 +73,14 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       do {
          bufferIndex = fillBuffer(bufferIndex);
 
-         switch (byteBuffer[bufferIndex]) {
-         case OPEN_CURLY:
+         final int b = byteBuffer[bufferIndex];
+         if (b == OPEN_CURLY) {
             bufferIndex = parseMembers(bufferIndex + 1, context);
-            continue;
-         case CLOSE_CURLY:
+         }
+         else if (b == CLOSE_CURLY) {
             return bufferIndex + 1;
-         default:
+         }
+         else {
             bufferIndex++;
          }
       } while (true);
@@ -97,13 +98,14 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             limit = bufferLimit;
          }
 
-         switch (byteBuffer[bufferIndex]) {
-         case QUOTE:
+         final int b = byteBuffer[bufferIndex];
+         if (b == QUOTE) {
             bufferIndex = parseMember(bufferIndex, context);
-            break;
-         case CLOSE_CURLY:
+         }
+         else if (b == CLOSE_CURLY) {
             return bufferIndex;
-         default:
+         }
+         else {
             bufferIndex++;
          }
       } while (true);
@@ -159,30 +161,33 @@ public final class FieldBasedJsonMapper implements ObjectMapper
                continue;
             }
 
-            switch (b) {
-            case QUOTE:
-               return (isAsciiValues ? parseAsciiString(bufferIndex, context) : parseString(bufferIndex, context));
-            case 't':
-               context.booleanHolder = true;
-               return bufferIndex;
-            case 'f':
-               context.booleanHolder = false;
-               return bufferIndex;
-            case 'n':
-               context.objectHolder = null;
-               return bufferIndex;
-            case OPEN_CURLY:
+            if (b == QUOTE) {
+               return skipCommaOrUptoCurly((isAsciiValues ? parseAsciiString(bufferIndex, context) : parseString(bufferIndex, context)), limit);
+            }
+            else if ((b > '1' - 1 && b < '9' + 1) || b == HYPHEN) {
+               return skipCommaOrUptoCurly(((context.holderType & Types.INTEGRAL_TYPE) > 0) ? parseInteger(bufferIndex - 1, context) : parseDecimal(bufferIndex - 1, context), limit);
+            }
+            else if (b == OPEN_CURLY) {
                bufferIndex = parseMembers(bufferIndex, nextContext);
-               break;
-            case CLOSE_CURLY:
+               // fall-thru
+            }
+            else if (b == CLOSE_CURLY) {
                return bufferIndex;
-            case OPEN_BRACKET:
+            }
+            else if (b == OPEN_BRACKET) {
                return parseArray(bufferIndex, nextContext);
-            default:
-               // Handle numbers
-               if ((b > '1' - 1 && b < '9' + 1) || b == HYPHEN) {
-                  return ((context.holderType & Types.INTEGRAL_TYPE) > 0) ? parseInteger(bufferIndex - 1, context) : parseDecimal(bufferIndex - 1, context);
-               }
+            }
+            else if (b == 't') {
+               context.booleanHolder = true;
+               return skipCommaOrUptoCurly(bufferIndex, limit);
+            }
+            else if (b == 'f') {
+               context.booleanHolder = false;
+               return skipCommaOrUptoCurly(bufferIndex, limit);
+            }
+            else if (b == 'n') {
+               context.objectHolder = null;
+               return skipCommaOrUptoCurly(bufferIndex, limit);
             }
          }
 
@@ -392,51 +397,64 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    private void setMember(final Phield phield, final ParseContext context)
    {
       try {
+         final int type = phield.type;
          if (phield.isIntegralType) {
-            switch (phield.type) {
-            case Types.INT:
+            if (type == Types.INT) {
                UNSAFE.putInt(context.target, phield.fieldOffset, (int) context.longHolder);
-               break;
-            case Types.LONG:
+            }
+            else if (type == Types.LONG) {
                UNSAFE.putLong(context.target, phield.fieldOffset, context.longHolder);
-               break;
-            case Types.SHORT:
+            }
+            else if (type == Types.SHORT) {
                UNSAFE.putShort(context.target, phield.fieldOffset, (short) context.longHolder);
-               break;
-            case Types.BYTE:
+            }
+            else if (type == Types.BYTE) {
                UNSAFE.putByte(context.target, phield.fieldOffset, (byte) context.longHolder);
-               break;
-            case Types.CHAR:
+            }
+            else if (type == Types.CHAR) {
                UNSAFE.putChar(context.target, phield.fieldOffset, (char) context.longHolder);
-               break;
             }
          }
          else {
-            switch (phield.type) {
-            case Types.STRING:
+            if (type == Types.STRING) {
                UNSAFE.putObject(context.target, phield.fieldOffset, context.stringHolder);
-               break;
-            case Types.OBJECT:
-               UNSAFE.putObject(context.target, phield.fieldOffset, (context.objectHolder == Void.TYPE ? null : context.objectHolder));
-               break;
-            case Types.DOUBLE:
+            }
+            else if (type == Types.DOUBLE) {
                UNSAFE.putDouble(context.target, phield.fieldOffset, context.doubleHolder);
-               break;
-            case Types.BOOLEAN:
+            }
+            else if (type == Types.OBJECT) {
+               UNSAFE.putObject(context.target, phield.fieldOffset, (context.objectHolder == Void.TYPE ? null : context.objectHolder));
+            }
+            else if (type == Types.BOOLEAN) {
                UNSAFE.putBoolean(context.target, phield.fieldOffset, context.booleanHolder);
-            case Types.FLOAT:
+            }
+            else if (type == Types.FLOAT) {
                UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
-               break;
-            case Types.DATE:
-               break;
-            case Types.ENUM:
-               break;
+            }
+            else if (type == Types.DATE) {
+            }
+            else if (type == Types.ENUM) {
             }
          }
       }
       catch (SecurityException | IllegalArgumentException e) {
          throw new RuntimeException(e);
       }
+   }
+
+   final private int skipCommaOrUptoCurly(int bufferIndex, final int limit)
+   {
+      for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++)
+      {
+         if (buffer[bufferIndex] == COMMA) {
+            return bufferIndex + 1;
+         }
+         else if (buffer[bufferIndex] == CLOSE_CURLY) {
+            return bufferIndex;
+         }
+      }
+
+      return bufferIndex;
    }
 
    final protected int fillBuffer(final int bufferIndex)
