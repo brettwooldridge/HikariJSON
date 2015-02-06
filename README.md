@@ -1,6 +1,6 @@
 HikariJSON
 ==========
 
-High-performance JSON parser.
+A High-performance JSON parser.
 
-Oh yeah, it's coming.  The fastest Java JSON libraries on the planet laid to waste.
+HikariJSON is targeted exclusively at Java 8.  If you need legacy support, there are several decent libraries available.
