@@ -27,7 +27,6 @@ public final class Phield
    @SuppressWarnings("rawtypes")
    public final Class<? extends Collection> collectionClass;
 
-   @SuppressWarnings("restriction")
    public Phield(final Field field, final boolean excluded) {
       Class<?> fieldClass = field.getType();
       this.field = field;

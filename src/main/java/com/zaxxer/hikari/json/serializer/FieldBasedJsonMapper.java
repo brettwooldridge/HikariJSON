@@ -7,7 +7,11 @@ import static com.zaxxer.hikari.json.util.Utf8Utils.seekBackUtf8Boundary;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.OffsetDateTime;
 import java.util.Collection;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.Map;
 
 import sun.misc.Unsafe;
@@ -19,7 +23,6 @@ import com.zaxxer.hikari.json.util.Phield;
 import com.zaxxer.hikari.json.util.Types;
 import com.zaxxer.hikari.json.util.UnsafeHelper;
 
-@SuppressWarnings("restriction")
 public final class FieldBasedJsonMapper implements ObjectMapper
 {
    protected static final int CR = '\r';
@@ -432,6 +435,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
                UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
             }
             else if (type == Types.DATE) {
+               UNSAFE.putObject(context.target, phield.fieldOffset, parseDate(context.stringHolder));
             }
             else if (type == Types.ENUM) {
             }
@@ -442,7 +446,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       }
    }
 
-   final private int skipCommaOrUptoCurly(int bufferIndex, final int limit)
+   private int skipCommaOrUptoCurly(int bufferIndex, final int limit)
    {
       for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++)
       {
@@ -455,6 +459,15 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       }
 
       return bufferIndex;
+   }
+
+   private HashMap<String, Date> dateCache = new HashMap<>();
+   private Date parseDate(String stringHolder)
+   {
+      return dateCache.computeIfAbsent(stringHolder, (k) -> {
+         final OffsetDateTime dateTime = OffsetDateTime.parse(stringHolder);
+         return GregorianCalendar.from(dateTime.toZonedDateTime()).getTime();
+      });
    }
 
    final protected int fillBuffer(final int bufferIndex)

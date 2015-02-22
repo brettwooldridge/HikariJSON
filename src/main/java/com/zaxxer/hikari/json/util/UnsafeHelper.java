@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 
 import sun.misc.Unsafe;
 
-@SuppressWarnings("restriction")
 public final class UnsafeHelper
 {
    private static final Unsafe UNSAFE;

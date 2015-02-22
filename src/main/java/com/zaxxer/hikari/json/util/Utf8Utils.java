@@ -4,7 +4,6 @@ import java.lang.reflect.Field;
 
 import sun.misc.Unsafe;
 
-@SuppressWarnings({ "restriction" })
 public final class Utf8Utils
 {
    private static final Unsafe unsafe;
