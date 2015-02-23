@@ -11,7 +11,6 @@ public class JsonFactory
    public static enum Option
    {
       CONSISTENT_STRUCTURE,
-      MEMBERS_ASCII,
       MEMBERS_UTF8,
       VALUES_ASCII,
       VALUES_UTF8,
@@ -35,7 +34,7 @@ public class JsonFactory
     */
    public static ObjectMapper create()
    {
-      return new FactoryOptions(Option.FIELD_ACCESS, Option.MEMBERS_ASCII, Option.VALUES_UTF8)
+      return new FactoryOptions(Option.FIELD_ACCESS, Option.VALUES_UTF8)
          .option(Option.COLLECTION_CLASS, ArrayList.class)
          .create();
    }

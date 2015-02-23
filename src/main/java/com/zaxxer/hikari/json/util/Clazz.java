@@ -10,7 +10,7 @@ import com.zaxxer.hikari.json.JsonProperty;
 public final class Clazz
 {
    private final Class<?> actualClass;
-   private final Map<String, Phield> fields;
+   private final Map<Integer, Phield> fields;
 
    public Clazz(Class<?> clazz)
    {
@@ -27,11 +27,11 @@ public final class Clazz
 
             Phield phield = new Phield(field, excluded);
             if (jsonProperty != null) {
-               fields.put(jsonProperty.name(), phield);
+               fields.put(jsonProperty.name().hashCode(), phield);
             }
             else {
-               fields.put(field.getName(), phield);
-               fields.put(field.getName().toLowerCase(), phield);
+               fields.put(field.getName().hashCode(), phield);
+               fields.put(field.getName().toLowerCase().hashCode(), phield);
             }
          }
       }
@@ -41,8 +41,8 @@ public final class Clazz
       return actualClass;
    }
 
-   public Phield getPhield(final String name) {
-      return fields.get(name);
+   public Phield getPhield(final int hashCode) {
+      return fields.get(hashCode);
    }
 
    @Override

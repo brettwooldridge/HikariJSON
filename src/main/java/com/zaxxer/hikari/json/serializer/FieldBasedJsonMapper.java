@@ -3,6 +3,7 @@ package com.zaxxer.hikari.json.serializer;
 import static com.zaxxer.hikari.json.util.Utf8Utils.fastTrackAsciiDecode;
 import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuote;
 import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuoteUTF8;
+import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuoteAndHash;
 import static com.zaxxer.hikari.json.util.Utf8Utils.seekBackUtf8Boundary;
 
 import java.io.IOException;
@@ -19,6 +20,7 @@ import sun.misc.Unsafe;
 import com.zaxxer.hikari.json.JsonFactory.Option;
 import com.zaxxer.hikari.json.ObjectMapper;
 import com.zaxxer.hikari.json.util.MutableBoolean;
+import com.zaxxer.hikari.json.util.MutableInteger;
 import com.zaxxer.hikari.json.util.Phield;
 import com.zaxxer.hikari.json.util.Types;
 import com.zaxxer.hikari.json.util.UnsafeHelper;
@@ -39,7 +41,6 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    protected static final int CLOSE_BRACKET = ']';
 
    private static final Unsafe UNSAFE = UnsafeHelper.getUnsafe();
-   private final boolean isAsciiMembers;
    private final boolean isAsciiValues;
    private final int BUFFER_SIZE = 16384;
 
@@ -51,7 +52,6 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    public FieldBasedJsonMapper(Map<Option, Object> options) {
       byteBuffer = new byte[BUFFER_SIZE];
 
-      isAsciiMembers = options.containsKey(Option.MEMBERS_ASCII);
       isAsciiValues = options.containsKey(Option.VALUES_ASCII);
       Object collClass = options.get(Option.COLLECTION_CLASS);
       if (collClass instanceof Class && Collection.class.isAssignableFrom((Class<?>) collClass)) {
@@ -117,7 +117,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    private int parseMember(int bufferIndex, final ParseContext context)
    {
       // Parse the member name
-      bufferIndex = (isAsciiMembers ? parseAsciiString(bufferIndex + 1, context) : parseString(bufferIndex + 1, context));
+      bufferIndex = parseMemberHashOnly(bufferIndex + 1, context);
 
       // Next character better be a colon
       do {
@@ -129,7 +129,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       } while (true);
 
       // Now the value
-      final Phield phield = context.clazz.getPhield(context.stringHolder);
+      final Phield phield = context.clazz.getPhield(context.lookupKey);
       context.holderType = phield.type;
       if (phield.type == Types.OBJECT) {
          final ParseContext nextContext;
@@ -244,6 +244,34 @@ public final class FieldBasedJsonMapper implements ObjectMapper
                else {
                   context.stringHolder = fastTrackAsciiDecode(byteBuffer, startIndex, (newIndex - startIndex));
                }
+               return newIndex + 1;
+            }
+
+            final byte[] newArray = new byte[bufferLimit * 2];
+            System.arraycopy(byteBuffer, 0, newArray, 0, byteBuffer.length);
+            byteBuffer = newArray;
+
+            int read = source.read(byteBuffer, bufferIndex, byteBuffer.length - bufferIndex);
+            if (read < 0) {
+               throw new RuntimeException("Insufficent data.");
+            }
+
+            bufferIndex = seekBackUtf8Boundary(byteBuffer, bufferIndex);
+         } while (true);
+      }
+      catch (Exception e) {
+         throw new RuntimeException();
+      }
+   }
+
+   private int parseMemberHashOnly(int bufferIndex, final ParseContext context)
+   {
+      try {
+         final MutableInteger hash = new MutableInteger();
+         do {
+            final int newIndex = findEndQuoteAndHash(byteBuffer, bufferIndex, hash);
+            if (newIndex > 0) {
+               context.lookupKey = hash.value;
                return newIndex + 1;
             }
 

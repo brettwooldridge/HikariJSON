@@ -34,7 +34,7 @@ public class TestParser1
    @Test
    public void testParser02() throws Exception
    {
-      ObjectMapper objectMapper = JsonFactory.option(Option.FIELD_ACCESS, Option.MEMBERS_ASCII, Option.VALUES_ASCII)
+      ObjectMapper objectMapper = JsonFactory.option(Option.FIELD_ACCESS, Option.VALUES_ASCII)
             .option(Option.COLLECTION_CLASS, LinkedList.class)
             .create();
 
@@ -53,7 +53,7 @@ public class TestParser1
    @Test
    public void testParser03() throws Exception
    {
-      ObjectMapper objectMapper = JsonFactory.option(Option.FIELD_ACCESS, Option.MEMBERS_ASCII, Option.VALUES_ASCII).create();
+      ObjectMapper objectMapper = JsonFactory.option(Option.FIELD_ACCESS, Option.VALUES_ASCII).create();
 
       File file = new File("src/test/resources/menu.json");
       try (InputStream is = new FileInputStream(file)) {

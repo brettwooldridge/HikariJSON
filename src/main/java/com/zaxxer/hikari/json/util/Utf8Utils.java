@@ -36,6 +36,20 @@ public final class Utf8Utils
       return -1; // we ran out of data
    }
 
+   public static int findEndQuoteAndHash(final byte[] array, int index, MutableInteger hash)
+   {
+      int h = hash.value;
+      for (; index < array.length; index++) {
+         if (array[index] == 0x22 /* quote */ && array[index - 1] != 0x5c /* backslash */) {
+            hash.value = h;
+            return index;
+         }
+         h = 31 * h + array[index];
+      }
+
+      return -1; // we ran out of data
+   }
+
    public static int findEndQuoteUTF8(final byte[] array, int index, final MutableBoolean utf8Detected)
    {
       for (; index < array.length; index++) {
