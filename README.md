@@ -11,4 +11,4 @@ Microbenchmarks were created to isolate and measure the overhead of popular JSON
 
 ![](https://github.com/brettwooldridge/HikariJSON/wiki/bench1.png)
 
-<span style="color: red;">Note: These are extremely early results and do not reflect our final goals.</span>
+*Note: These are extremely early results and do not reflect our final goals.*
