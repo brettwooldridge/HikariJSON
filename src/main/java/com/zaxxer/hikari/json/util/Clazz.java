@@ -15,7 +15,7 @@ public final class Clazz
    public Clazz(Class<?> clazz)
    {
       this.actualClass = clazz;
-      this.fields = new HashMap<>();
+      this.fields = new HashMap<>((int)(actualClass.getDeclaredFields().length * 1.3));
    }
 
    void parseFields()
