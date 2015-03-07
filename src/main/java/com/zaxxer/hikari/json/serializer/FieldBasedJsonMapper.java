@@ -92,16 +92,24 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    private int parseMembers(int bufferIndex, final ParseContext context)
    {
       int limit = bufferLimit;
-      do {
-         for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
-            ; // skip whitespace
+top:  do {
+         final byte[] buffer = byteBuffer;
+         int b;
+         while (true) {
+            if (bufferIndex == limit) {
+               bufferIndex = fillBuffer(bufferIndex);
+               limit = bufferLimit;
+               continue top;
+            }
 
-         if (bufferIndex == limit) {
-            bufferIndex = fillBuffer(bufferIndex);
-            limit = bufferLimit;
+            b = buffer[bufferIndex];
+            if (b > SPACE) {
+               break;
+            }
+
+            bufferIndex++;
          }
 
-         final int b = byteBuffer[bufferIndex];
          if (b == QUOTE) {
             bufferIndex = parseMember(bufferIndex, context);
          }
@@ -120,13 +128,13 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       bufferIndex = parseMemberHashOnly(bufferIndex + 1, context);
 
       // Next character better be a colon
+      byte[] buffer = byteBuffer;
       do {
-         bufferIndex = fillBuffer(bufferIndex);
-
-         if (byteBuffer[bufferIndex++] == COLON) {
-            break;
+         if (bufferIndex == bufferLimit) {
+            bufferIndex = fillBuffer(bufferIndex);
+            buffer = byteBuffer;
          }
-      } while (true);
+      } while (buffer[bufferIndex++] != COLON);
 
       // Now the value
       final Phield phield = context.clazz.getPhield(context.lookupKey);
