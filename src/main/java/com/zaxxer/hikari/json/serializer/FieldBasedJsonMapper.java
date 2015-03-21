@@ -128,13 +128,11 @@ top:  do {
       bufferIndex = parseMemberHashOnly(bufferIndex + 1, context);
 
       // Next character better be a colon
-      byte[] buffer = byteBuffer;
       do {
          if (bufferIndex == bufferLimit) {
             bufferIndex = fillBuffer(bufferIndex);
-            buffer = byteBuffer;
          }
-      } while (buffer[bufferIndex++] != COLON);
+      } while (byteBuffer[bufferIndex++] != COLON);
 
       // Now the value
       final Phield phield = context.clazz.getPhield(context.lookupKey);
