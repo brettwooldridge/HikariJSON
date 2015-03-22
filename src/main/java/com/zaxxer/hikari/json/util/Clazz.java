@@ -2,36 +2,62 @@ package com.zaxxer.hikari.json.util;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Arrays;
 
 import com.zaxxer.hikari.json.JsonProperty;
 
 public final class Clazz
 {
    private final Class<?> actualClass;
-   private final Map<Integer, Phield> fields;
+
+   private final Phield[] fields;
+   private final int[] fieldHashes;
+   private final int[] quickLookup;
 
    public Clazz(Class<?> clazz)
    {
       this.actualClass = clazz;
-      this.fields = new HashMap<>((int)(actualClass.getDeclaredFields().length * 1.3));
+
+      int fieldCount = 0;
+      for (Field field : actualClass.getDeclaredFields()) {
+         fieldCount += (Modifier.isStatic(field.getModifiers()) ? 0 : 1); 
+      }
+
+      fields = new Phield[fieldCount];
+      fieldHashes = new int[fieldCount];
+      quickLookup = new int[32];
    }
 
    void parseFields()
    {
+      int ndx = 0;
       for (Field field : actualClass.getDeclaredFields()) {
          if (!Modifier.isStatic(field.getModifiers())) {
             JsonProperty jsonProperty = field.getAnnotation(JsonProperty.class);
+            int hash = (jsonProperty != null ? jsonProperty.name().hashCode() : field.getName().hashCode());
+            fieldHashes[ndx] = hash;
+            ndx++;
+         }
+      }
+
+      Arrays.sort(fieldHashes);
+      for (Field field : actualClass.getDeclaredFields()) {
+         if (!Modifier.isStatic(field.getModifiers())) {
+            JsonProperty jsonProperty = field.getAnnotation(JsonProperty.class);
+            int hash = (jsonProperty != null ? jsonProperty.name().hashCode() : field.getName().hashCode());
             boolean excluded = (jsonProperty != null && jsonProperty.exclude());
 
             Phield phield = new Phield(field, excluded);
-            if (jsonProperty != null) {
-               fields.put(jsonProperty.name().hashCode(), phield);
-            }
-            else {
-               fields.put(field.getName().hashCode(), phield);
-               fields.put(field.getName().toLowerCase().hashCode(), phield);
+
+            // Hash slot
+            int slot = (hash & quickLookup.length - 1);
+            for (int i = 0; i < fieldHashes.length; i++) {
+
+               if (fieldHashes[i] == hash) {
+                  fields[i] = phield;
+                  quickLookup[slot] = i + 1;
+                  break;
+               }
             }
          }
       }
@@ -42,7 +68,18 @@ public final class Clazz
    }
 
    public Phield getPhield(final int hashCode) {
-      return fields.get(hashCode);
+      final int ndx = quickLookup[(hashCode & quickLookup.length - 1)] - 1; // Hash slot lookup
+      if (ndx != -1 && fieldHashes[ndx] == hashCode) {
+         return fields[ndx];
+      }
+
+      for (int i = 0; i < fieldHashes.length; i++) {
+         if (fieldHashes[i] == hashCode) {
+            return fields[i];
+         }
+      }
+
+      throw new RuntimeException("No method found for hashCode " + hashCode);
    }
 
    @Override
