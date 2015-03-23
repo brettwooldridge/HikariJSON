@@ -91,25 +91,13 @@ public final class FieldBasedJsonMapper implements ObjectMapper
 
    private int parseMembers(int bufferIndex, final ParseContext context)
    {
-      int limit = bufferLimit;
-top:  do {
-         final byte[] buffer = byteBuffer;
-         int b;
-         while (true) {
-            if (bufferIndex == limit) {
-               bufferIndex = fillBuffer(bufferIndex);
-               limit = bufferLimit;
-               continue top;
-            }
-
-            b = buffer[bufferIndex];
-            if (b > SPACE) {
-               break;
-            }
-
-            bufferIndex++;
+      do {
+         bufferIndex = skipWhitespace(bufferIndex, bufferLimit);
+         if (bufferIndex == bufferLimit) {
+            fillBuffer(bufferIndex);
          }
 
+         final int b = byteBuffer[bufferIndex];
          if (b == QUOTE) {
             bufferIndex = parseMember(bufferIndex, context);
          }
@@ -128,11 +116,7 @@ top:  do {
       bufferIndex = parseMemberHashOnly(bufferIndex + 1, context);
 
       // Next character better be a colon
-      do {
-         if (bufferIndex == bufferLimit) {
-            bufferIndex = fillBuffer(bufferIndex);
-         }
-      } while (byteBuffer[bufferIndex++] != COLON);
+      bufferIndex = skipUtil(bufferIndex, bufferLimit, COLON);
 
       // Now the value
       final Phield phield = context.clazz.getPhield(context.lookupKey);
@@ -161,15 +145,12 @@ top:  do {
 
    private int parseValue(int bufferIndex, final ParseContext context, final ParseContext nextContext)
    {
+      int limit = bufferLimit;
       do {
-         int limit = bufferLimit;
-         while (bufferIndex < limit) {
-
+         do {
+            bufferIndex = skipWhitespace(bufferIndex, limit);
+            
             final int b = byteBuffer[bufferIndex++];
-            if (b <= SPACE) {
-               continue;
-            }
-
             if (b == QUOTE) {
                return skipCommaOrUptoCurly((isAsciiValues ? parseAsciiString(bufferIndex, context) : parseString(bufferIndex, context)), limit);
             }
@@ -198,23 +179,16 @@ top:  do {
                context.objectHolder = null;
                return skipCommaOrUptoCurly(bufferIndex, limit);
             }
-         }
+         } while (bufferIndex < limit);
 
-         bufferIndex = fillBuffer(bufferIndex);
+         limit = bufferLimit;
       } while (true);
    }
 
    private int parseArray(int bufferIndex, final ParseContext context)
    {
-      int limit = bufferLimit;
       do {
-         for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
-            ; // skip whitespace
-
-         if (bufferIndex == limit) {
-            bufferIndex = fillBuffer(bufferIndex);
-            limit = bufferLimit;
-         }
+         bufferIndex = skipWhitespace(bufferIndex, bufferLimit);
 
          switch (byteBuffer[bufferIndex]) {
          case CLOSE_BRACKET:
@@ -456,20 +430,20 @@ top:  do {
             if (type == Types.STRING) {
                UNSAFE.putObject(context.target, phield.fieldOffset, context.stringHolder);
             }
-            else if (type == Types.DOUBLE) {
-               UNSAFE.putDouble(context.target, phield.fieldOffset, context.doubleHolder);
-            }
             else if (type == Types.OBJECT) {
                UNSAFE.putObject(context.target, phield.fieldOffset, (context.objectHolder == Void.TYPE ? null : context.objectHolder));
             }
             else if (type == Types.BOOLEAN) {
                UNSAFE.putBoolean(context.target, phield.fieldOffset, context.booleanHolder);
             }
-            else if (type == Types.FLOAT) {
-               UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
-            }
             else if (type == Types.DATE) {
                UNSAFE.putObject(context.target, phield.fieldOffset, parseDate(context.stringHolder));
+            }
+            else if (type == Types.DOUBLE) {
+               UNSAFE.putDouble(context.target, phield.fieldOffset, context.doubleHolder);
+            }
+            else if (type == Types.FLOAT) {
+               UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
             }
             else if (type == Types.ENUM) {
             }
@@ -493,6 +467,36 @@ top:  do {
       }
 
       return bufferIndex;
+   }
+
+   private int skipUtil(int bufferIndex, int limit, final int c)
+   {
+      do {
+         for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++)
+         {
+            if (buffer[bufferIndex] == c) {
+               return bufferIndex + 1;
+            }
+         }
+
+         bufferIndex = fillBuffer(bufferIndex);
+         limit = bufferLimit;
+      } while (true);
+   }
+
+   private int skipWhitespace(int bufferIndex, int limit)
+   {
+      do {
+         for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++)
+         {
+            if (buffer[bufferIndex] > SPACE) {
+               return bufferIndex;
+            }
+         }
+
+         bufferIndex = fillBuffer(bufferIndex);
+         limit = bufferLimit;
+      } while (true);
    }
 
    private HashMap<String, Date> dateCache = new HashMap<>();
