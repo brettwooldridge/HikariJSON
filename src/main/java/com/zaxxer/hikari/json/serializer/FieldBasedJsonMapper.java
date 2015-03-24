@@ -92,7 +92,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    private int parseMembers(int bufferIndex, final ParseContext context)
    {
       do {
-         bufferIndex = skipWhitespace(bufferIndex, bufferLimit);
+         bufferIndex = skipWhitespace(bufferIndex);
          if (bufferIndex == bufferLimit) {
             fillBuffer(bufferIndex);
          }
@@ -116,7 +116,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       bufferIndex = parseMemberHashOnly(bufferIndex + 1, context);
 
       // Next character better be a colon
-      bufferIndex = skipUtil(bufferIndex, bufferLimit, COLON);
+      bufferIndex = skipUtil(bufferIndex, COLON);
 
       // Now the value
       final Phield phield = context.clazz.getPhield(context.lookupKey);
@@ -148,14 +148,14 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       int limit = bufferLimit;
       do {
          do {
-            bufferIndex = skipWhitespace(bufferIndex, limit);
+            bufferIndex = skipWhitespace(bufferIndex);
             
             final int b = byteBuffer[bufferIndex++];
             if (b == QUOTE) {
-               return skipCommaOrUptoCurly((isAsciiValues ? parseAsciiString(bufferIndex, context) : parseString(bufferIndex, context)), limit);
+               return skipCommaOrUptoCurly((isAsciiValues ? parseAsciiString(bufferIndex, context) : parseString(bufferIndex, context)));
             }
             else if ((b > '1' - 1 && b < '9' + 1) || b == HYPHEN) {
-               return skipCommaOrUptoCurly(((context.holderType & Types.INTEGRAL_TYPE) > 0) ? parseInteger(bufferIndex - 1, context) : parseDecimal(bufferIndex - 1, context), limit);
+               return skipCommaOrUptoCurly(((context.holderType & Types.INTEGRAL_TYPE) > 0) ? parseInteger(bufferIndex - 1, context) : parseDecimal(bufferIndex - 1, context));
             }
             else if (b == OPEN_CURLY) {
                bufferIndex = parseMembers(bufferIndex, nextContext);
@@ -169,15 +169,15 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             }
             else if (b == 't') {
                context.booleanHolder = true;
-               return skipCommaOrUptoCurly(bufferIndex, limit);
+               return skipCommaOrUptoCurly(bufferIndex);
             }
             else if (b == 'f') {
                context.booleanHolder = false;
-               return skipCommaOrUptoCurly(bufferIndex, limit);
+               return skipCommaOrUptoCurly(bufferIndex);
             }
             else if (b == 'n') {
                context.objectHolder = null;
-               return skipCommaOrUptoCurly(bufferIndex, limit);
+               return skipCommaOrUptoCurly(bufferIndex);
             }
          } while (bufferIndex < limit);
 
@@ -188,7 +188,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    private int parseArray(int bufferIndex, final ParseContext context)
    {
       do {
-         bufferIndex = skipWhitespace(bufferIndex, bufferLimit);
+         bufferIndex = skipWhitespace(bufferIndex);
 
          switch (byteBuffer[bufferIndex]) {
          case CLOSE_BRACKET:
@@ -454,48 +454,56 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       }
    }
 
-   private int skipCommaOrUptoCurly(int bufferIndex, final int limit)
-   {
-      for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++)
-      {
-         if (buffer[bufferIndex] == COMMA) {
-            return bufferIndex + 1;
-         }
-         else if (buffer[bufferIndex] == CLOSE_CURLY) {
-            return bufferIndex;
-         }
-      }
-
-      return bufferIndex;
-   }
-
-   private int skipUtil(int bufferIndex, int limit, final int c)
+   private int skipCommaOrUptoCurly(int bufferIndex)
    {
       do {
-         for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++)
-         {
-            if (buffer[bufferIndex] == c) {
-               return bufferIndex + 1;
+         final byte[] buffer = byteBuffer;
+         try {
+            while (true)
+            {
+               if (buffer[bufferIndex] == CLOSE_CURLY) {
+                  return bufferIndex;
+               }
+               else if (buffer[bufferIndex++] == COMMA) {
+                  return bufferIndex;
+               }
             }
          }
-
-         bufferIndex = fillBuffer(bufferIndex);
-         limit = bufferLimit;
+         catch (ArrayIndexOutOfBoundsException e) {
+            bufferIndex = fillBuffer(bufferIndex);
+         }
       } while (true);
    }
 
-   private int skipWhitespace(int bufferIndex, int limit)
+   private int skipUtil(int bufferIndex, final int c)
    {
       do {
-         for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++)
-         {
-            if (buffer[bufferIndex] > SPACE) {
-               return bufferIndex;
-            }
+         try {
+            final byte[] buffer = byteBuffer;
+            while (buffer[bufferIndex++] != c);
+            return bufferIndex;
          }
+         catch (ArrayIndexOutOfBoundsException e) {
+            bufferIndex = fillBuffer(bufferIndex);
+         }
+      } while (true);
+   }
 
-         bufferIndex = fillBuffer(bufferIndex);
-         limit = bufferLimit;
+   private int skipWhitespace(int bufferIndex)
+   {
+      do {
+         try {
+            final byte[] buffer = byteBuffer;
+            while (buffer[bufferIndex] < SPACE + 1)
+            {
+                bufferIndex++;
+            }
+
+            return bufferIndex;
+         }
+         catch (ArrayIndexOutOfBoundsException e) {
+            bufferIndex = fillBuffer(bufferIndex);
+         }
       } while (true);
    }
 
