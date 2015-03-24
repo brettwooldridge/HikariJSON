@@ -25,3 +25,10 @@ Benchmark                    Mode  Cnt        Score      Error  Units
 AllTypesHikari.inputStream  thrpt   16   482929.297 ± 3326.916  ops/s
 MenuHikari.inputStream      thrpt   16  1287691.706 ± 3985.767  ops/s
 ```
+
+2015 March 24: d73a3bf220a04cc6368203c23fe121423f02ccf7
+```
+Benchmark                    Mode  Cnt        Score      Error  Units
+AllTypesHikari.inputStream  thrpt   16   517719.764 ± 2504.558  ops/s
+MenuHikari.inputStream      thrpt   16  1402698.567 ± 6432.890  ops/s
+```
