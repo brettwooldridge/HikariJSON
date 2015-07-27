@@ -12,3 +12,4 @@ Microbenchmarks were created to isolate and measure the performance of popular J
 ![](https://github.com/brettwooldridge/HikariJSON/wiki/bench1.png)
 
 *Note: These are extremely early results and do not reflect our final goals.*
+
