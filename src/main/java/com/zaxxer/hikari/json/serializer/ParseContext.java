@@ -17,6 +17,7 @@ public final class ParseContext
    public boolean booleanHolder;
    public long longHolder;
    public double doubleHolder;
+   public int lookupKey;
 
    public ParseContext(final Class<?> targetType) {
       this.clazz = ClassUtils.reflect(targetType);

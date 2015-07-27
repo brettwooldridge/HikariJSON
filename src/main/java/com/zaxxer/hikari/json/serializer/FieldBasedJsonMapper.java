@@ -3,6 +3,7 @@ package com.zaxxer.hikari.json.serializer;
 import static com.zaxxer.hikari.json.util.Utf8Utils.fastTrackAsciiDecode;
 import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuote;
 import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuoteUTF8;
+import static com.zaxxer.hikari.json.util.Utf8Utils.findEndQuoteAndHash;
 import static com.zaxxer.hikari.json.util.Utf8Utils.seekBackUtf8Boundary;
 
 import java.io.IOException;
@@ -19,6 +20,7 @@ import sun.misc.Unsafe;
 import com.zaxxer.hikari.json.JsonFactory.Option;
 import com.zaxxer.hikari.json.ObjectMapper;
 import com.zaxxer.hikari.json.util.MutableBoolean;
+import com.zaxxer.hikari.json.util.MutableInteger;
 import com.zaxxer.hikari.json.util.Phield;
 import com.zaxxer.hikari.json.util.Types;
 import com.zaxxer.hikari.json.util.UnsafeHelper;
@@ -39,7 +41,6 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    protected static final int CLOSE_BRACKET = ']';
 
    private static final Unsafe UNSAFE = UnsafeHelper.getUnsafe();
-   private final boolean isAsciiMembers;
    private final boolean isAsciiValues;
    private final int BUFFER_SIZE = 16384;
 
@@ -51,7 +52,6 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    public FieldBasedJsonMapper(Map<Option, Object> options) {
       byteBuffer = new byte[BUFFER_SIZE];
 
-      isAsciiMembers = options.containsKey(Option.MEMBERS_ASCII);
       isAsciiValues = options.containsKey(Option.VALUES_ASCII);
       Object collClass = options.get(Option.COLLECTION_CLASS);
       if (collClass instanceof Class && Collection.class.isAssignableFrom((Class<?>) collClass)) {
@@ -91,14 +91,10 @@ public final class FieldBasedJsonMapper implements ObjectMapper
 
    private int parseMembers(int bufferIndex, final ParseContext context)
    {
-      int limit = bufferLimit;
       do {
-         for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
-            ; // skip whitespace
-
-         if (bufferIndex == limit) {
-            bufferIndex = fillBuffer(bufferIndex);
-            limit = bufferLimit;
+         bufferIndex = skipWhitespace(bufferIndex);
+         if (bufferIndex == bufferLimit) {
+            fillBuffer(bufferIndex);
          }
 
          final int b = byteBuffer[bufferIndex];
@@ -117,19 +113,13 @@ public final class FieldBasedJsonMapper implements ObjectMapper
    private int parseMember(int bufferIndex, final ParseContext context)
    {
       // Parse the member name
-      bufferIndex = (isAsciiMembers ? parseAsciiString(bufferIndex + 1, context) : parseString(bufferIndex + 1, context));
+      bufferIndex = parseMemberHashOnly(bufferIndex + 1, context);
 
       // Next character better be a colon
-      do {
-         bufferIndex = fillBuffer(bufferIndex);
-
-         if (byteBuffer[bufferIndex++] == COLON) {
-            break;
-         }
-      } while (true);
+      bufferIndex = skipUtil(bufferIndex, COLON);
 
       // Now the value
-      final Phield phield = context.clazz.getPhield(context.stringHolder);
+      final Phield phield = context.clazz.getPhield(context.lookupKey);
       context.holderType = phield.type;
       if (phield.type == Types.OBJECT) {
          final ParseContext nextContext;
@@ -155,20 +145,17 @@ public final class FieldBasedJsonMapper implements ObjectMapper
 
    private int parseValue(int bufferIndex, final ParseContext context, final ParseContext nextContext)
    {
+      int limit = bufferLimit;
       do {
-         int limit = bufferLimit;
-         while (bufferIndex < limit) {
-
+         do {
+            bufferIndex = skipWhitespace(bufferIndex);
+            
             final int b = byteBuffer[bufferIndex++];
-            if (b <= SPACE) {
-               continue;
-            }
-
             if (b == QUOTE) {
-               return skipCommaOrUptoCurly((isAsciiValues ? parseAsciiString(bufferIndex, context) : parseString(bufferIndex, context)), limit);
+               return skipCommaOrUptoCurly((isAsciiValues ? parseAsciiString(bufferIndex, context) : parseString(bufferIndex, context)));
             }
             else if ((b > '1' - 1 && b < '9' + 1) || b == HYPHEN) {
-               return skipCommaOrUptoCurly(((context.holderType & Types.INTEGRAL_TYPE) > 0) ? parseInteger(bufferIndex - 1, context) : parseDecimal(bufferIndex - 1, context), limit);
+               return skipCommaOrUptoCurly(((context.holderType & Types.INTEGRAL_TYPE) > 0) ? parseInteger(bufferIndex - 1, context) : parseDecimal(bufferIndex - 1, context));
             }
             else if (b == OPEN_CURLY) {
                bufferIndex = parseMembers(bufferIndex, nextContext);
@@ -182,33 +169,26 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             }
             else if (b == 't') {
                context.booleanHolder = true;
-               return skipCommaOrUptoCurly(bufferIndex, limit);
+               return skipCommaOrUptoCurly(bufferIndex);
             }
             else if (b == 'f') {
                context.booleanHolder = false;
-               return skipCommaOrUptoCurly(bufferIndex, limit);
+               return skipCommaOrUptoCurly(bufferIndex);
             }
             else if (b == 'n') {
                context.objectHolder = null;
-               return skipCommaOrUptoCurly(bufferIndex, limit);
+               return skipCommaOrUptoCurly(bufferIndex);
             }
-         }
+         } while (bufferIndex < limit);
 
-         bufferIndex = fillBuffer(bufferIndex);
+         limit = bufferLimit;
       } while (true);
    }
 
    private int parseArray(int bufferIndex, final ParseContext context)
    {
-      int limit = bufferLimit;
       do {
-         for (final byte[] buffer = byteBuffer; bufferIndex < limit && buffer[bufferIndex] <= SPACE; bufferIndex++)
-            ; // skip whitespace
-
-         if (bufferIndex == limit) {
-            bufferIndex = fillBuffer(bufferIndex);
-            limit = bufferLimit;
-         }
+         bufferIndex = skipWhitespace(bufferIndex);
 
          switch (byteBuffer[bufferIndex]) {
          case CLOSE_BRACKET:
@@ -244,6 +224,34 @@ public final class FieldBasedJsonMapper implements ObjectMapper
                else {
                   context.stringHolder = fastTrackAsciiDecode(byteBuffer, startIndex, (newIndex - startIndex));
                }
+               return newIndex + 1;
+            }
+
+            final byte[] newArray = new byte[bufferLimit * 2];
+            System.arraycopy(byteBuffer, 0, newArray, 0, byteBuffer.length);
+            byteBuffer = newArray;
+
+            int read = source.read(byteBuffer, bufferIndex, byteBuffer.length - bufferIndex);
+            if (read < 0) {
+               throw new RuntimeException("Insufficent data.");
+            }
+
+            bufferIndex = seekBackUtf8Boundary(byteBuffer, bufferIndex);
+         } while (true);
+      }
+      catch (Exception e) {
+         throw new RuntimeException();
+      }
+   }
+
+   private int parseMemberHashOnly(int bufferIndex, final ParseContext context)
+   {
+      try {
+         final MutableInteger hash = new MutableInteger();
+         do {
+            final int newIndex = findEndQuoteAndHash(byteBuffer, bufferIndex, hash);
+            if (newIndex > 0) {
+               context.lookupKey = hash.value;
                return newIndex + 1;
             }
 
@@ -422,20 +430,20 @@ public final class FieldBasedJsonMapper implements ObjectMapper
             if (type == Types.STRING) {
                UNSAFE.putObject(context.target, phield.fieldOffset, context.stringHolder);
             }
-            else if (type == Types.DOUBLE) {
-               UNSAFE.putDouble(context.target, phield.fieldOffset, context.doubleHolder);
-            }
             else if (type == Types.OBJECT) {
                UNSAFE.putObject(context.target, phield.fieldOffset, (context.objectHolder == Void.TYPE ? null : context.objectHolder));
             }
             else if (type == Types.BOOLEAN) {
                UNSAFE.putBoolean(context.target, phield.fieldOffset, context.booleanHolder);
             }
-            else if (type == Types.FLOAT) {
-               UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
-            }
             else if (type == Types.DATE) {
                UNSAFE.putObject(context.target, phield.fieldOffset, parseDate(context.stringHolder));
+            }
+            else if (type == Types.DOUBLE) {
+               UNSAFE.putDouble(context.target, phield.fieldOffset, context.doubleHolder);
+            }
+            else if (type == Types.FLOAT) {
+               UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
             }
             else if (type == Types.ENUM) {
             }
@@ -446,19 +454,57 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       }
    }
 
-   private int skipCommaOrUptoCurly(int bufferIndex, final int limit)
+   private int skipCommaOrUptoCurly(int bufferIndex)
    {
-      for (final byte[] buffer = byteBuffer; bufferIndex < limit; bufferIndex++)
-      {
-         if (buffer[bufferIndex] == COMMA) {
-            return bufferIndex + 1;
+      do {
+         final byte[] buffer = byteBuffer;
+         try {
+            while (true)
+            {
+               if (buffer[bufferIndex] == CLOSE_CURLY) {
+                  return bufferIndex;
+               }
+               else if (buffer[bufferIndex++] == COMMA) {
+                  return bufferIndex;
+               }
+            }
          }
-         else if (buffer[bufferIndex] == CLOSE_CURLY) {
+         catch (ArrayIndexOutOfBoundsException e) {
+            bufferIndex = fillBuffer(bufferIndex);
+         }
+      } while (true);
+   }
+
+   private int skipUtil(int bufferIndex, final int c)
+   {
+      do {
+         try {
+            final byte[] buffer = byteBuffer;
+            while (buffer[bufferIndex++] != c);
             return bufferIndex;
          }
-      }
+         catch (ArrayIndexOutOfBoundsException e) {
+            bufferIndex = fillBuffer(bufferIndex);
+         }
+      } while (true);
+   }
 
-      return bufferIndex;
+   private int skipWhitespace(int bufferIndex)
+   {
+      do {
+         try {
+            final byte[] buffer = byteBuffer;
+            while (buffer[bufferIndex] < SPACE + 1)
+            {
+                bufferIndex++;
+            }
+
+            return bufferIndex;
+         }
+         catch (ArrayIndexOutOfBoundsException e) {
+            bufferIndex = fillBuffer(bufferIndex);
+         }
+      } while (true);
    }
 
    private HashMap<String, Date> dateCache = new HashMap<>();

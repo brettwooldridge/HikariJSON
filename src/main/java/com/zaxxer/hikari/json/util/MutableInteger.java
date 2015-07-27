@@ -15,7 +15,10 @@
  */
 package com.zaxxer.hikari.json.util;
 
-public final class MutableBoolean
+/**
+ * @author Brett Wooldridge
+ */
+public final class MutableInteger
 {
-   public boolean bool;
+   public int value;
 }
