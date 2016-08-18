@@ -410,42 +410,46 @@ public final class FieldBasedJsonMapper implements ObjectMapper
       try {
          final int type = phield.type;
          if (phield.isIntegralType) {
-            if (type == Types.INT) {
+            switch(type) {
+            case Types.INT:
                UNSAFE.putInt(context.target, phield.fieldOffset, (int) context.longHolder);
-            }
-            else if (type == Types.LONG) {
+               break;
+            case Types.LONG:
                UNSAFE.putLong(context.target, phield.fieldOffset, context.longHolder);
-            }
-            else if (type == Types.SHORT) {
+               break;
+            case Types.SHORT:
                UNSAFE.putShort(context.target, phield.fieldOffset, (short) context.longHolder);
-            }
-            else if (type == Types.BYTE) {
+               break;
+            case Types.BYTE:
                UNSAFE.putByte(context.target, phield.fieldOffset, (byte) context.longHolder);
-            }
-            else if (type == Types.CHAR) {
+               break;
+            case Types.CHAR:
                UNSAFE.putChar(context.target, phield.fieldOffset, (char) context.longHolder);
+               break;
             }
          }
          else {
-            if (type == Types.STRING) {
+            switch(type) {
+            case Types.STRING:
                UNSAFE.putObject(context.target, phield.fieldOffset, context.stringHolder);
-            }
-            else if (type == Types.OBJECT) {
+               break;
+            case Types.OBJECT:
                UNSAFE.putObject(context.target, phield.fieldOffset, (context.objectHolder == Void.TYPE ? null : context.objectHolder));
-            }
-            else if (type == Types.BOOLEAN) {
+               break;
+            case Types.BOOLEAN:
                UNSAFE.putBoolean(context.target, phield.fieldOffset, context.booleanHolder);
-            }
-            else if (type == Types.DATE) {
+               break;
+            case Types.DATE:
                UNSAFE.putObject(context.target, phield.fieldOffset, parseDate(context.stringHolder));
-            }
-            else if (type == Types.DOUBLE) {
+               break;
+            case Types.DOUBLE:
                UNSAFE.putDouble(context.target, phield.fieldOffset, context.doubleHolder);
-            }
-            else if (type == Types.FLOAT) {
+               break;
+            case Types.FLOAT:
                UNSAFE.putFloat(context.target, phield.fieldOffset, (float) context.doubleHolder);
-            }
-            else if (type == Types.ENUM) {
+               break;
+            case Types.ENUM:
+               break;
             }
          }
       }
