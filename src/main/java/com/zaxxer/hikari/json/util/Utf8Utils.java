@@ -80,13 +80,13 @@ public final class Utf8Utils
 
    public static String fastTrackAsciiDecode(final byte[] buf, final int offset, final int length)
    {
-      final char[] chars = new char[length];
-      for (int i = 0; i < length; i++) {
-         chars[i] = (char) buf[offset + i];
-      }
+//      final char[] chars = new char[length];
+//      for (int i = 0; i < length; i++) {
+//         chars[i] = (char) buf[offset + i];
+//      }
 
-      final String s = new String();
-      unsafe.putObject(s, fieldOffset, chars);
+      final String s = new String(buf, 0, offset, length);
+      // unsafe.putObject(s, fieldOffset, chars);
       return s;
    }
 }
