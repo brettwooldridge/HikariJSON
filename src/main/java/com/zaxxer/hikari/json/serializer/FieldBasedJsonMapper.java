@@ -233,7 +233,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
 
             int read = source.read(byteBuffer, bufferIndex, byteBuffer.length - bufferIndex);
             if (read < 0) {
-               throw new RuntimeException("Insufficent data.");
+               throw new RuntimeException("Insufficient data.");
             }
 
             bufferIndex = seekBackUtf8Boundary(byteBuffer, bufferIndex);
@@ -261,7 +261,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
 
             int read = source.read(byteBuffer, bufferIndex, byteBuffer.length - bufferIndex);
             if (read < 0) {
-               throw new RuntimeException("Insufficent data.");
+               throw new RuntimeException("Insufficient data.");
             }
 
             bufferIndex = seekBackUtf8Boundary(byteBuffer, bufferIndex);
@@ -289,7 +289,7 @@ public final class FieldBasedJsonMapper implements ObjectMapper
 
             int read = source.read(byteBuffer, bufferIndex, byteBuffer.length - bufferIndex);
             if (read < 0) {
-               throw new RuntimeException("Insufficent data.");
+               throw new RuntimeException("Insufficient data.");
             }
 
             bufferIndex = seekBackUtf8Boundary(byteBuffer, bufferIndex);
